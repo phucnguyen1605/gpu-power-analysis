@@ -396,8 +396,12 @@ có số TMUs đúng.
 \subsection{Xử lý dữ liệu khuyết}
 
 \textbf{Cách xử lý.} Nhóm không điền giá trị khuyết. Bộ dữ liệu cuối giữ nguyên các ô
-\texttt{NA} (tỉ lệ khuyết của từng cột ở Bảng~\ref{tab:columns}). Khi làm một phân tích,
-nhóm chỉ bỏ những dòng bị khuyết ở các biến mà phân tích đó dùng. Ví dụ:
+\texttt{NA} (tỉ lệ khuyết của từng cột ở Bảng~\ref{tab:columns}). Nhóm cũng không loại bỏ
+các dòng khuyết ngay ở bước tiền xử lý, vì tỉ lệ khuyết quá lớn: \PreRowsIncomplete{} trong
+\PreRowsFinal{} dòng (\PreRowsIncompletePct\%) có ít nhất một ô khuyết, nên nếu loại bỏ
+hết thì chỉ còn \PreRowsComplete{} dòng, và phân tích chỉ cần công suất sẽ mất
+\PrePowerRowsLostByDropAll{} card dù có đủ số liệu công suất. Thay vào đó, khi làm một phân
+tích, nhóm chỉ bỏ những dòng bị khuyết ở các biến mà phân tích đó dùng. Ví dụ:
 \begin{itemize}
   \item tính khoảng tin cậy cho công suất trung bình chỉ cần biến công suất, nên dùng được
     \PreRowsWithPower{} trong \PreRowsFinal{} card;

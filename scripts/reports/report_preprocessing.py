@@ -123,6 +123,12 @@ def imputation_effect(analysis: pd.DataFrame) -> dict[str, str]:
     ]
     return {
         "RowsWithPower": int(power.notna().sum()),
+        "RowsComplete": int(analysis.notna().all(axis=1).sum()),
+        "RowsIncomplete": int(analysis.isna().any(axis=1).sum()),
+        "RowsIncompletePct": percent(analysis.isna().any(axis=1).sum(), len(analysis)),
+        "PowerRowsLostByDropAll": int(
+            (power.notna() & analysis.isna().any(axis=1)).sum()
+        ),
         "RowsWithPowerAndPredictors": int(
             analysis[["max_power_w", *predictors]].notna().all(axis=1).sum()
         ),
