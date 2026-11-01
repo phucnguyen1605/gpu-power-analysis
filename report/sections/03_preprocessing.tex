@@ -324,7 +324,7 @@ Bước này tạo các biến mà nhiều phân tích phải dùng cùng một 
   \item \texttt{needs\_aux\_power}: công suất trên 75~W, mức tối đa một khe PCIe cấp được,
     tức card cần thêm dây nguồn phụ. Cột này chỉ có ý nghĩa với card desktop, vì card
     laptop không cắm qua khe PCIe (có \PreLaptopAuxPower{} card laptop trên 75~W); khi
-    dùng biến này cần chỉ xét card desktop.
+    dùng cột này cần chỉ xét card desktop.
   \item \texttt{memory\_type\_group}: loại bộ nhớ, gộp các loại có ít hơn 30 card biết
     công suất (\PreMemoryTypeOtherNames) thành ``Other'', còn \PreMemoryTypeGroups{} nhóm.
     Ngưỡng 30 giúp mỗi nhóm đủ lớn để so sánh giữa các nhóm. Nhóm ``Other'' gộp các công
@@ -407,7 +407,7 @@ Các biến giải thích cũng có giá trị khuyết, nhiều nhất là \tex
 \textbf{Nhận xét.} Card khuyết số liệu công suất nhìn chung là card đời cũ hơn (trung vị năm phát
 hành \PreMissingMedianYear{} so với \PreObservedMedianYear{}, kiểm định Mann--Whitney,
 $p$ \PreMissingYearP). Phép so sánh theo hãng chỉ xét Nvidia và AMD: ATI
-(\PreAtiCards{} card) có \PreAtiMissing{} card khuyết công suất và Intel chỉ có \PreIntelCards{}
+(\PreAtiCards{} card, \PreAtiMissing{} card khuyết công suất) và Intel chỉ có \PreIntelCards{}
 card. Trong số card Nvidia và AMD, nhóm khuyết công suất có tỉ lệ AMD cao
 hơn (\PreMissingAmdPct\% so với \PreObservedAmdPct\%, kiểm định khi bình phương,
 $p$ \PreMissingMakerP). Như vậy dữ liệu khuyết không hoàn toàn ngẫu nhiên, và các thống kê
