@@ -51,20 +51,6 @@ def parse_bandwidth(values: pd.Series) -> pd.Series:
     return (pd.to_numeric(parts["number"]) * scale).astype("Float64")
 
 
-def parse_multiplied(values: pd.Series, unit: str = "") -> pd.Series:
-    """Parse ``"32"`` -> 32 and ``"16 (x2)"`` -> 32.
-
-    The ``(xN)`` suffix is a multiplier, not a GPU count: the single-GPU
-    Radeon RX 580 lists its ROPs as ``"16 (x2)"`` and has 32 ROPs. L2 cache
-    uses the same notation, e.g. ``"256KB(x2)"``.
-    """
-    pattern = rf"^(?P<base>{NUMBER})\s?{re.escape(unit)}(?:\s?\(x(?P<factor>\d+)\))?$"
-    parts = values.str.extract(pattern)
-    _check_all_parsed(values, parts["base"], f"'<number>{unit}' or '... (xN)'")
-    factor = pd.to_numeric(parts["factor"]).fillna(1)
-    return (pd.to_numeric(parts["base"]) * factor).astype("Float64")
-
-
 def parse_multiplier(values: pd.Series) -> pd.Series:
     """Return N from an ``"a (xN)"`` suffix, or 1 when there is no suffix.
 
@@ -72,35 +58,6 @@ def parse_multiplier(values: pd.Series) -> pd.Series:
     """
     factor = values.str.extract(r"\(x(\d+)\)$", expand=False)
     return pd.to_numeric(factor).fillna(1).astype("Float64")
-
-
-def normalize_version(values: pd.Series, prefix: str = "") -> pd.Series:
-    """Write versions one way: ``"DX 12"`` and ``"DX 12.0"`` both become ``"12.0"``.
-
-    A trailing letter is kept (``"DX 9.0c"`` -> ``"9.0c"``).
-    """
-    parts = values.str.extract(
-        rf"^{re.escape(prefix)}(?P<major>\d+)(?:\.(?P<minor>\d+))?(?P<letter>[a-z]?)$"
-    )
-    _check_all_parsed(values, parts["major"], f"'{prefix}<major>[.<minor>][letter]'")
-    version = (
-        parts["major"] + "." + parts["minor"].fillna("0") + parts["letter"].fillna("")
-    )
-    return version.astype("category")
-
-
-def parse_resolution(values: pd.Series) -> pd.DataFrame:
-    """Split ``"2560x1600"`` or ``"1366 x 768"`` into width and height."""
-    parts = values.str.extract(r"^(?P<width>\d+)\s?x\s?(?P<height>\d+)$")
-    _check_all_parsed(values, parts["width"], "'<width>x<height>'")
-    return parts.apply(pd.to_numeric).astype("Float64")
-
-
-def parse_psu(values: pd.Series) -> pd.DataFrame:
-    """Split ``"450 Watt & 38 Amps"`` into watts and amps; amps may be absent."""
-    parts = values.str.extract(r"^(?P<watts>\d+) Watt(?: & (?P<amps>\d+) Amps)?$")
-    _check_all_parsed(values, parts["watts"], "'<n> Watt[ & <n> Amps]'")
-    return parts.apply(pd.to_numeric).astype("Float64")
 
 
 def parse_yes_no(values: pd.Series) -> pd.Series:

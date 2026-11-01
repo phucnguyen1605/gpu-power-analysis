@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from gpu_power_analysis import clean, parsers
+from gpu_power_analysis import parsers, preprocess
 
 
 def text(values: list[str | None]) -> pd.Series:
@@ -35,19 +35,6 @@ def test_parse_bandwidth_converts_mb():
     ]
 
 
-def test_parse_multiplied():
-    assert parsers.parse_multiplied(text(["32", "16 (x2)"])).tolist() == [32.0, 32.0]
-    assert parsers.parse_multiplied(text(["256KB(x2)"]), "KB").tolist() == [512.0]
-
-
-def test_parse_resolution_and_psu():
-    resolution = parsers.parse_resolution(text(["2560x1600", "1366 x 768"]))
-    assert resolution["width"].tolist() == [2560.0, 1366.0]
-    psu = parsers.parse_psu(text(["450 Watt & 38 Amps", "300 Watt"]))
-    assert psu["watts"].tolist() == [450.0, 300.0]
-    assert psu["amps"].tolist() == [38.0, pd.NA]
-
-
 def test_parse_yes_no_rejects_other_values():
     with pytest.raises(ValueError):
         parsers.parse_yes_no(text(["Yes", "Maybe"]))
@@ -79,23 +66,12 @@ def test_parse_yes_no_rejects_other_values():
     ],
 )
 def test_multi_gpu_rules(name, expected):
-    assert clean.match_multi_gpu_rules(text([name])).iloc[0] == expected
+    assert preprocess.match_multi_gpu_rules(text([name])).iloc[0] == expected
 
 
 def test_parse_multiplier_defaults_to_one():
     result = parsers.parse_multiplier(text(["16 (x2)", "32", None]))
     assert result.tolist() == [2.0, 1.0, 1.0]
-
-
-@pytest.mark.parametrize(
-    ("values", "prefix", "expected"),
-    [
-        (["DX 12", "DX 12.0", "DX 9.0c"], "DX ", ["12.0", "12.0", "9.0c"]),
-        (["5", "5.0", "4.1"], "", ["5.0", "5.0", "4.1"]),
-    ],
-)
-def test_normalize_version_merges_spellings(values, prefix, expected):
-    assert parsers.normalize_version(text(values), prefix).tolist() == expected
 
 
 def test_parse_number_rejects_other_currency_and_separators():

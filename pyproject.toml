@@ -11,6 +11,7 @@ requires-python = ">=3.13"
 dependencies = [
     "pandas>=3.0",
     "pyarrow>=18",  # Parquet keeps column dtypes between pipeline steps
+    "scipy>=1.14",  # hypothesis tests
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,31 @@
+% Xem trước riêng Mục 3 khi chưa ghép vào báo cáo chính.
+% Biên dịch từ thư mục report/:
+%   python ../scripts/report_preprocessing.py   (nếu dữ liệu thay đổi)
+%   tectonic preview_section3.tex
+\documentclass[12pt,a4paper]{article}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{fontspec}
+\setmainfont{texgyretermes}[Extension=.otf,UprightFont=*-regular,
+  BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
+\setmonofont{DejaVuSansMono}[Extension=.ttf,Scale=0.85,BoldFont=*-Bold]
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,tabularx,array}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\lstlistingname}{Đoạn code}
+\lstset{basicstyle=\small\ttfamily, keywordstyle=\color{blue},
+  stringstyle=\color{violet}, frame=tb, breaklines=true,
+  showstringspaces=false, columns=flexible}
+
+\input{generated/preprocessing_numbers.tex}
+
+\begin{document}
+\setcounter{section}{2}
+\input{sections/03_preprocessing.tex}
+\end{document}

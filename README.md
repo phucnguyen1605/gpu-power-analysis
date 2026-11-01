@@ -19,10 +19,10 @@ pip install -e . --no-deps           # để import được package gpu_power_a
 ## Chạy
 
 ```bash
-python scripts/01_clean_raw.py       # bước 1: làm sạch dữ liệu thô
-python scripts/02_build_dataset.py   # bước 2: dữ liệu cho đề tài
-pytest                               # chạy test
-ruff format . && ruff check .        # format và kiểm tra code trước khi commit
+python scripts/01_preprocess.py         # tiền xử lý: dữ liệu thô -> dữ liệu cho đề tài
+python scripts/report_preprocessing.py  # số liệu cho mục tiền xử lý của báo cáo (LaTeX)
+pytest                                  # chạy test
+ruff format . && ruff check .           # format và kiểm tra code trước khi commit
 ```
 
 ## Cấu trúc
@@ -31,47 +31,55 @@ ruff format . && ruff check .        # format và kiểm tra code trước khi c
 gpu-power-analysis/
 ├── data/
 │   ├── raw/All_GPUs.csv                 dữ liệu gốc, không bao giờ sửa
-│   ├── interim/                         bước 1: dữ liệu sạch dùng chung (do script sinh ra)
-│   └── processed/                       bước 2: dữ liệu của đề tài (do script sinh ra)
+│   └── processed/                       dữ liệu cho đề tài (do script sinh ra)
 ├── src/gpu_power_analysis/
 │   ├── paths.py                         đường dẫn tới mọi file
 │   ├── parsers.py                       các hàm đổi chuỗi thành số, ngày, Yes/No
-│   ├── clean.py                         bước 1: 4 bước làm sạch, mỗi bước một hàm
-│   └── dataset.py                       bước 2: lọc dòng, chọn và thêm biến
-├── scripts/01_clean_raw.py              chạy bước 1, in kết quả từng bước con
-├── scripts/02_build_dataset.py          chạy bước 2, in kết quả từng bước con
+│   └── preprocess.py                    7 bước tiền xử lý, mỗi bước một hàm
+├── scripts/01_preprocess.py             chạy tiền xử lý, in kết quả từng bước
 ├── tests/test_parsers.py                test cho các hàm đọc giá trị
-├── tests/test_clean_invariants.py       test file sạch không mất hay tự sinh dữ liệu
-└── tests/test_dataset.py                test bước 2
+└── tests/test_preprocess.py             test cho quy trình tiền xử lý
 ```
 
-## Bước làm sạch (`scripts/01_clean_raw.py`)
+## Tiền xử lý (`scripts/01_preprocess.py`)
 
-Kết quả **giữ đủ 3406 dòng và 34 biến gốc**. Bước này chỉ làm những việc khách quan;
-các dòng có thể cần loại chỉ được **gắn cờ**, không bị xóa. Việc chọn dòng và biến cho
-đề tài thuộc bước sau.
-
-| Bước | Hàm | Việc làm | Ví dụ |
+| Bước | Hàm | Việc làm | Kết quả hiện tại |
 |---|---|---|---|
-| 1 | `read_raw` | Đọc mọi cột dạng chuỗi, xóa khoảng trắng, đổi ô trống, `"-"`, `"Unknown Release Date"` thành giá trị thiếu; gán `gpu_id` | `"\n01-Mar-2009 "` → `"01-Mar-2009"` |
-| 2 | `parse_columns` | Đổi từng cột sang đúng kiểu; **gặp định dạng lạ thì dừng và báo lỗi**; kiểm tra tính nhất quán giữa các cột | `"738 MHz"` → 738; `"800MB/sec"` → 0,8; `"24 (x4)"` → 96; `"450 Watt & 38 Amps"` → 450 và 38 |
-| 3 | `add_flags` | Gắn cờ `is_multi_gpu` (theo luật tên sản phẩm), `is_unreleased`, `is_exact_duplicate` | 246 / 18 / 0 dòng |
-| 4 | `describe_columns` | Lập từ điển dữ liệu: cột gốc, kiểu, số và % thiếu, ý nghĩa | |
+| 1 | `read_raw` | Đọc mọi cột dưới dạng chuỗi, chưa đổi giá trị nào; gán `gpu_id` | 3406 dòng × 34 cột |
+| 2 | `select_columns` | Chỉ giữ 18 cột cần cho đề tài (`USED_COLUMNS`) | 18 cột |
+| 3 | `clean_text` | Xóa khoảng trắng; đổi ô trống, `"-"`, `"Unknown Release Date"` thành giá trị thiếu; sửa lỗi mã hóa tên | `"\n01-Mar-2009 "` → `"01-Mar-2009"` |
+| 4 | `parse_columns` | Tách đơn vị, đổi kiểu, sửa lỗi `(xN)`; **gặp định dạng lạ thì dừng và báo lỗi**; `check_consistency` kiểm tra kết quả | `"738 MHz"` → 738; `"800MB/sec"` → 0,8; TMUs `56` → 224 khi ROPs ghi `"24 (x4)"` |
+| 5 | `filter_rows` | Giữ GPU rời → bỏ cấu hình nhiều GPU → bỏ card chưa phát hành → bỏ dòng trùng | 3406 → 3018 → 2775 → 2762 → 2762 dòng |
+| 6 | `derive_variables` | Thêm `segment`, `needs_aux_power` (trên 75 W), `texture_rate_per_watt`, `memory_type_group` (gộp các loại có dưới 30 card **có số liệu công suất** thành "Other"); giữ 16 cột cuối | 2318 desktop, 444 laptop |
+| 7 | `describe_columns` | Từ điển dữ liệu, có cột `role` (vai trò) và `used_in` (phân tích sử dụng) | 16 cột |
 
-**Đầu ra** (`data/interim/`):
+**Đầu ra** (`data/processed/`):
 
 | File | Dùng cho |
 |---|---|
-| `gpus_all_clean.parquet` | Code đọc: giữ nguyên kiểu dữ liệu. Dùng `clean.load_all_clean()` |
-| `gpus_all_clean.csv` | Người xem: mở bằng Excel để kiểm tra |
-| `gpus_all_clean_dictionary.csv` | Từ điển dữ liệu |
+| `gpus_analysis.parquet` | Code đọc: giữ nguyên kiểu dữ liệu. Dùng `preprocess.load_analysis()` |
+| `gpus_analysis.csv` | Người xem: mở bằng bảng tính để kiểm tra |
+| `gpus_analysis_dictionary.csv` | Từ điển dữ liệu |
+| `row_counts.csv` | Số dòng sau từng bước lọc |
 
+### Các cột được chọn (bước 2)
 
-### Nhận diện card nhiều GPU
+- **Có trong dữ liệu cuối:** `Name`, `Manufacturer`, `Architecture`, `Release_Date`,
+  `Notebook_GPU`, `Max_Power`, `TMUs`, `Core_Speed`, `Memory`, `Memory_Bandwidth`,
+  `Memory_Type`, `Process`.
+- **Chỉ dùng trong lúc xử lý:** `Dedicated` (lọc GPU rời), `ROPs` (lấy hệ số N để sửa
+  lỗi `(xN)`), `Texture_Rate` (kiểm tra lỗi, tính hiệu quả năng lượng), `Boost_Clock`,
+  `Memory_Bus`, `Memory_Speed` (kiểm tra lỗi).
+- 16 cột còn lại của dữ liệu gốc (cổng xuất hình, độ phân giải, phiên bản API, giá bán,
+  bộ nguồn khuyến nghị, L2 cache…) không liên quan tới đề tài nên không được xử lý. Cần
+  thêm cột nào thì thêm vào `USED_COLUMNS`, viết dòng chuyển đổi trong `parse_columns`
+  và khai báo trong `COLUMNS`.
+
+### Nhận diện cấu hình nhiều GPU (bước 5)
 
 Cấu hình nhiều GPU (ghép nhiều card SLI/CrossFire, card hai chip trên một bo mạch, đồ
 họa lai AMD Dual Graphics) được nhận diện **tự động** bằng 5 luật dựa trên tên sản phẩm
-(`MULTI_GPU_RULES` trong `clean.py`):
+(`MULTI_GPU_RULES` trong `preprocess.py`):
 
 | Luật | Dấu hiệu | Số dòng |
 |---|---|---|
@@ -83,7 +91,7 @@ họa lai AMD Dual Graphics) được nhận diện **tự động** bằng 5 lu
 
 Tổng cộng **246 dòng** (một dòng có thể khớp nhiều luật).
 
-**Cách xây dựng luật:** mọi dòng khớp luật đã được **kiểm tra thủ công** 
+**Cách xây dựng luật:** mọi dòng khớp luật đã được **kiểm tra thủ công**
 bằng thông số trong chính dữ liệu: card hai chip có TMUs và độ rộng bus gấp đôi card
 đơn tương ứng. Các luật được viết hẹp để tránh bắt nhầm card một GPU: "Quadro",
 "Dual-X", "TurboDuo", tản nhiệt "IceQ X2" / "Twin X2" / "WindForce 2X", chip laptop
@@ -92,40 +100,22 @@ bằng thông số trong chính dữ liệu: card hai chip có TMUs và độ r�
 
 ### Các điểm cần biết về dữ liệu
 
-- `ROPs` và `L2_Cache` dạng `"a (xN)"` là **phép nhân**, không phải số GPU: Titan XP
-  ghi `"24 (x4)"` và có 96 ROPs.
+- `ROPs` dạng `"a (xN)"` là **phép nhân**, không phải số GPU: Titan XP ghi `"24 (x4)"`
+  và có 96 ROPs.
 - **Ở 305 dòng có ROPs dạng `"a (xN)"`, cột `TMUs` và `Memory_Bus` bị ghi chia cho
   N** (ký hiệu `(xN)` chỉ còn ở ROPs). Bằng chứng: `Texture_Rate` = TMUs × xung nhịp
-  và băng thông = bus × tốc độ bộ nhớ chỉ khớp sau khi nhân lại với N. Code nhân lại
-  và lưu N ở cột `spec_multiplier`. Ví dụ GTX 1080 Ti: TMUs 56 → 224, bus 88 → 352 bit.
-- Cùng một phiên bản nhưng viết khác nhau được gộp về một cách viết:
-  `"DX 12"` và `"DX 12.0"` → `"12.0"`; Shader Model `"5"` và `"5.0"` → `"5.0"`.
-- `Pixel_Rate`, `Texture_Rate` được tính theo **xung boost** khi card có boost, và được
-  làm tròn tới số nguyên trong file gốc.
+  và băng thông = bus × tốc độ bộ nhớ chỉ khớp sau khi nhân lại với N. Code nhân lại.
+  Ví dụ GTX 1080 Ti: TMUs 56 → 224, bus 88 → 352 bit.
+- `Texture_Rate` được tính theo **xung boost** khi card có boost, và được làm tròn tới số
+  nguyên trong file gốc.
 - `Memory_Speed` không so sánh được giữa các loại bộ nhớ: băng thông = bus/8 ×
   tốc độ × k, với k = 1 (DDR), 2 (DDR2/DDR3), 4 (GDDR5), 8 (GDDR5X).
-- Script tự kiểm tra hai đẳng thức trên ở bước 2 và báo số dòng không khớp. Hiện còn
-  4 dòng băng thông không khớp, đều là cấu hình SLI (băng thông của hai card cộng lại).
+- Script tự kiểm tra hai đẳng thức trên ở bước 4 và báo số dòng không khớp. Hiện còn
+  4 dòng băng thông không khớp, đều là cấu hình SLI (băng thông của hai card cộng lại),
+  bị loại ở bước 5.
 - Một tên sản phẩm bị lỗi mã hóa ký tự (`"XÂ²"`) được sửa thành `"X²"`.
-- `Shader` là phiên bản Shader Model (ví dụ 5.0), **không phải** số nhân xử lý.
-- `PSU` là bộ nguồn khuyến nghị cho **cả hệ thống**, không phải công suất của card.
-- `Power_Connector = "None"` không đáng tin: nhiều card trên 75 W vẫn ghi "None".
 
-## Bước 2: dữ liệu cho đề tài (`scripts/02_build_dataset.py`)
-
-Áp dụng các **quyết định riêng của đề tài** lên kết quả bước 1.
-
-| Bước | Hàm | Việc làm | Kết quả hiện tại |
-|---|---|---|---|
-| 1 | `filter_rows` | Giữ GPU rời → bỏ card nhiều GPU → bỏ card chưa phát hành → bỏ dòng trùng | 3406 → 3018 → 2775 → 2762 → 2762 dòng |
-| 2 | `derive_variables` | Thêm `segment` (Desktop/Laptop), `needs_aux_power` (trên 75 W), `texture_rate_per_watt`, `memory_type_group` (gộp các loại có dưới 30 card **có số liệu công suất** thành "Other", để mỗi nhóm đủ lớn cho ANOVA); **chỉ giữ các cột có phân tích sử dụng** | 2318 desktop, 444 laptop |
-| 3 | `describe_columns` | Từ điển dữ liệu, có cột `role` (vai trò) và `used_in` (phân tích sử dụng) | 16 cột |
-
-**Đầu ra** (`data/processed/`): `gpus_analysis.parquet` (code đọc bằng
-`dataset.load_analysis()`), `gpus_analysis.csv`, `gpus_analysis_dictionary.csv`,
-`row_counts.csv` (số dòng sau từng bước lọc, dùng cho báo cáo).
-
-**16 cột của dữ liệu cuối:**
+### 16 cột của dữ liệu cuối
 
 | Vai trò (`role`) | Cột | Dùng cho |
 |---|---|---|
@@ -140,19 +130,17 @@ bằng thông số trong chính dữ liệu: card hai chip có TMUs và độ r�
 | Thời gian (`time`) | `release_year` | Thống kê mô tả (xu hướng theo năm); kiểm chứng ngoài mẫu (chia giai đoạn) |
 | Cụm (`cluster`) | `architecture` (các card cùng chip không độc lập với nhau) | Hồi quy (sai số chuẩn theo cụm) |
 
-Các cột không phân tích nào dùng (`release_date`, `rops`, `pixel_rate_gpixel_s`,
-`texture_rate_gtexel_s`, `memory_speed_mhz`, `memory_bus_bit`, `power_connector`) không
-đưa vào dữ liệu cuối nhưng **vẫn còn trong dữ liệu sạch dùng chung của bước 1**
-(`gpus_all_clean`). Cần thêm cột nào thì thêm vào `COLUMNS` trong `dataset.py`.
+### Nguyên tắc và phạm vi
 
-**Nguyên tắc:** không xóa dòng thiếu dữ liệu và không điền giá trị cho biến đáp ứng
-`max_power_w` (thiếu ở 481 dòng). Mỗi bài toán tự chọn các dòng đủ biến.
-
-**Phạm vi:** tiền xử lý chỉ gồm đọc dữ liệu, xử lý định dạng, xử lý dữ liệu khuyết,
-lọc quan sát, chọn biến và tạo biến mới. Các biến mới chỉ gồm những biến mà nhiều mục
-phải dùng **cùng một định nghĩa** (ngưỡng 75 W, cách gộp nhóm bộ nhớ). **Ngoại lai,
-biến đổi log và mẫu riêng của từng mô hình không được xử lý ở bước này**; mỗi mục phân
-tích tự làm trong bối cảnh của mình (ví dụ lấy log ngay trong công thức hồi quy).
+- **Không điền giá trị thiếu** cho biến mục tiêu `max_power_w` (thiếu ở 481 dòng). Mỗi
+  bài toán tự chọn các dòng đủ biến.
+- **14 dòng không rõ GPU rời hay tích hợp bị loại** theo quy tắc `Dedicated = Yes`,
+  không điền tay. Không dòng nào trong số đó đủ biến cho mô hình hồi quy.
+- **Không sửa tay giá trị** theo nguồn bên ngoài; chỉ sửa các lỗi phát hiện được một cách
+  có hệ thống từ chính dữ liệu (lỗi `(xN)`).
+- Tiền xử lý chỉ tạo những biến mới mà nhiều phân tích phải dùng **cùng một định nghĩa**
+  (ngưỡng 75 W, cách gộp nhóm bộ nhớ). **Ngoại lai, biến đổi log và mẫu riêng của từng
+  mô hình** do mỗi phân tích tự làm (ví dụ lấy log ngay trong công thức hồi quy).
 
 ## Dữ liệu này dùng được cho những phân tích nào
 
@@ -172,13 +160,19 @@ tính các card **có số liệu công suất** (`max_power_w` không thiếu).
 Ví dụ lấy mẫu cho hồi quy:
 
 ```python
-from gpu_power_analysis.dataset import load_analysis
+from gpu_power_analysis.preprocess import load_analysis
 
 gpus = load_analysis()
-predictors = ["tmus", "core_speed_mhz", "memory_bandwidth_gb_s", "memory_mb", "process_nm"]
+predictors = [
+    "tmus",
+    "core_speed_mhz",
+    "memory_bandwidth_gb_s",
+    "memory_mb",
+    "process_nm",
+]
 sample = gpus[
     gpus["segment"].eq("Desktop") & gpus["manufacturer"].isin(["Nvidia", "AMD"])
-].dropna(subset=["max_power_w", *predictors])   # 1557 rows
+].dropna(subset=["max_power_w", *predictors])  # 1557 rows
 ```
 
 ## Quy chuẩn code

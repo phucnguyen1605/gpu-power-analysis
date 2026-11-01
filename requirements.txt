@@ -8,5 +8,6 @@ Pygments==2.21.0
 pytest==9.2.0
 python-dateutil==3.0.0
 ruff==0.17.3
+scipy==1.18.1
 six==1.17.0
 tzdata==2026.6
