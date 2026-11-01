@@ -20,12 +20,12 @@ Phần này trình bày quá trình chuyển tệp \texttt{All\_GPUs.csv} (\PreR
 các phân tích ở mục sau. Toàn bộ quy trình viết bằng Python (thư viện
 \texttt{pandas}), chạy lại được từ đầu và cho cùng một kết quả. Quy trình gồm sáu bước:
 đọc dữ liệu, chọn biến, làm sạch chuỗi, xử lý định dạng, lọc quan sát và tạo biến mới
-(Hình~\ref{fig:preprocess}); cách xử lý dữ liệu khuyết được trình bày ở cuối mục.
+(Hình~\ref{fig:preprocess}).
 
 Nhóm tuân theo ba nguyên tắc: không sửa tay dữ liệu gốc; mỗi hàm đọc giá trị chỉ chấp
 nhận đúng định dạng đã biết và dừng chương trình nếu gặp giá trị lạ; không điền giá trị
-cho biến mục tiêu \texttt{Max\_Power}. Việc xử lý ngoại lai và biến đổi logarit thuộc về
-từng phân tích nên được thực hiện ở các mục sau.
+cho biến mục tiêu \texttt{Max\_Power}. Ngoại lai và biến đổi logarit được xử lý trong
+từng phân tích ở các mục sau, vì mỗi phân tích cần một cách xử lý khác nhau.
 
 \begin{figure}[!htb]
   \centering
@@ -56,7 +56,7 @@ từng phân tích nên được thực hiện ở các mục sau.
 % ---------------------------------------------------------------------
 \subsection{Đọc dữ liệu}
 
-Nhóm đọc mọi cột dưới dạng chuỗi và chưa chuyển đổi giá trị nào, để mọi giá trị đều được
+Mọi cột được đọc dưới dạng chuỗi, chưa chuyển đổi giá trị nào, để từng giá trị đều được
 kiểm tra định dạng ở các bước sau. Mỗi dòng được gán mã \texttt{gpu\_id} là vị trí của
 dòng trong tệp gốc để truy vết.
 
@@ -82,7 +82,9 @@ Trong \PreColsRaw{} biến gốc, nhóm chỉ giữ \PreColsSelected{} biến c�
 \end{itemize}
 \par}
 Các biến còn lại như cổng xuất hình, độ phân giải, phiên bản DirectX, giá bán hay bộ
-nguồn khuyến nghị không liên quan tới câu hỏi nghiên cứu nên không được xử lý tiếp.
+nguồn khuyến nghị không liên quan tới câu hỏi nghiên cứu nên bị bỏ. Tỉ lệ khuyết không
+được dùng làm tiêu chí chọn biến, vì chính biến mục tiêu \texttt{Max\_Power} cũng thiếu
+khá nhiều.
 
 % ---------------------------------------------------------------------
 \subsection{Làm sạch chuỗi}
@@ -110,7 +112,10 @@ thiếu trong mục này đều được tính sau khi đã đổi các ký hi�
 
 Phần lớn biến số được ghi kèm đơn vị. Nhóm tách phần số và đổi sang kiểu số theo mẫu
 định dạng riêng của từng biến (Bảng~\ref{tab:formats}); giá trị nào không khớp mẫu thì
-chương trình dừng và báo lỗi.
+chương trình dừng và báo lỗi. Cách xóa mọi ký tự không phải chữ số tuy đơn giản hơn
+nhưng cho kết quả sai ở hai trường hợp: \verb|"800MB/sec"| còn lại 800 và bị hiểu là
+800~GB/s thay vì 0,8~GB/s; \verb|"16 (x2)"| còn lại các chữ số ``162'' thay vì
+$16 \times 2 = 32$.
 
 \begin{table}[!htbp]
   \centering
@@ -135,16 +140,21 @@ chương trình dừng và báo lỗi.
 \textbf{Nhận xét.}
 \begin{itemize}
   \item \PreBandwidthInMb{} dòng ghi băng thông theo MB/sec được đổi sang GB/s.
+  \item Các biến định tính \texttt{Manufacturer} và \texttt{Memory\_Type} được chuyển sang
+    kiểu phân loại (\texttt{category}, tương đương \texttt{factor} trong R) để dùng làm
+    biến phân nhóm.
   \item Giá trị dạng ``$a$ (x$N$)'' (\PreRopsMultiplier{} dòng của \texttt{ROPs}) là phép
     nhân: Radeon RX~580 ghi \verb|"16 (x2)"| và có $16 \times 2 = 32$ ROPs.
-  \item Ở đúng các dòng này, \texttt{TMUs} bị ghi \textbf{chia cho $N$}. Bằng chứng là tốc
+  \item Ở đúng các dòng này, \texttt{TMUs} bị ghi chia cho $N$. Bằng chứng là tốc
     độ xử lý texture phải bằng TMUs nhân xung nhịp, nhưng \PreTextureMismatchBefore{} dòng
     không thỏa; sau khi nhân lại với $N$ thì còn \PreTextureMismatchAfter{} dòng. Ví dụ
-    GTX 1080 Ti được ghi 56 TMUs, giá trị đúng là 224. Lỗi này quan trọng vì
-    \texttt{TMUs} (số đơn vị xử lý texture) phản ánh độ lớn của GPU và là một biến giải
-    thích công suất trong mô hình hồi quy; nếu không sửa, các card đời 2016--2017 sẽ bị
-    xem như card nhỏ hơn nhiều so với thực tế. \texttt{Memory\_Bus} cũng bị chia cho $N$
-    ở các dòng này và được sửa theo cùng cách.
+    GTX 1080 Ti được ghi 56 TMUs, giá trị đúng là 224. Theo nguyên tắc làm sạch dữ liệu,
+    giá trị sai được sửa khi tìm được giá trị đúng \cite{vandenbroeck2005}; ở đây giá
+    trị đúng tính được từ chính các cột khác của dòng đó. \texttt{TMUs} (số đơn vị xử lý
+    texture) phản ánh độ lớn của GPU và là một biến giải thích công suất trong mô hình
+    hồi quy, nên nếu không sửa, các card đời 2016--2017 sẽ bị xem như card nhỏ hơn nhiều
+    so với thực tế. \texttt{Memory\_Bus} cũng bị chia cho $N$ ở các dòng này và được sửa
+    theo cùng cách.
 \end{itemize}
 
 \begin{lstlisting}[language=Python, caption={Sửa lỗi ``(x$N$)'': nhân lại TMUs và Memory\_Bus với $N$}]
@@ -188,7 +198,7 @@ và \PreLaptop{} card laptop.
 % ---------------------------------------------------------------------
 \subsection{Tạo biến mới}
 
-Nhóm tạo thêm các biến mà nhiều phân tích phải dùng cùng một định nghĩa, rồi giữ lại
+Bước này tạo các biến mà nhiều phân tích phải dùng cùng một định nghĩa, rồi giữ lại
 \PreColsFinal{} cột cho bộ dữ liệu cuối (Bảng~\ref{tab:columns}, kèm tỉ lệ khuyết của
 từng cột):
 \begin{itemize}
@@ -238,14 +248,13 @@ từng cột):
 \subsection{Xử lý dữ liệu khuyết}
 
 Biến mục tiêu \texttt{max\_power\_w} thiếu ở \PrePowerMissing{} dòng
-(\PrePowerMissingPct\%). Nhóm \textbf{không điền} giá trị thiếu, vì điền bằng trung bình
+(\PrePowerMissingPct\%). Nhóm không điền giá trị thiếu, vì điền bằng trung bình
 hay trung vị sẽ làm sai lệch phân phối; mỗi phân tích tự chọn các dòng có đủ biến cần
 dùng.
 
 Các biến giải thích cũng có giá trị khuyết, nhiều nhất là \texttt{core\_speed\_mhz}
 (\PreMissingPctCoreSpeedMhz\%) và \texttt{tmus} (\PreMissingPctTmus\%)
-(Bảng~\ref{tab:columns}). Vì vậy số dòng dùng được cho một phân tích phụ thuộc vào các
-biến mà phân tích đó cần, và mô hình dùng nhiều biến sẽ có ít dòng hơn.
+(Bảng~\ref{tab:columns}), nên một phân tích dùng càng nhiều biến thì càng còn ít dòng.
 
 \textbf{Nhận xét.} Card thiếu số liệu công suất là card đời cũ hơn (trung vị năm phát
 hành \PreMissingMedianYear{} so với \PreObservedMedianYear{}, kiểm định Mann--Whitney
@@ -281,9 +290,8 @@ mỗi cột là một biến.
 \end{table}
 
 \textbf{Kết quả.} Bộ dữ liệu sau tiền xử lý gồm \PreRowsFinal{} GPU rời và
-\PreColsFinal{} cột, được dùng cho các phân tích ở các mục sau. Bảng~\ref{tab:sample}
-là một vài dòng của bộ dữ liệu: các biến số đã ở dạng số với một đơn vị thống nhất,
-giá trị thiếu được ghi là \texttt{NA}, và GTX 1080 Ti đã có số TMUs đúng.
+\PreColsFinal{} cột. Trong các dòng mẫu ở Bảng~\ref{tab:sample}, mỗi biến số đã ở dạng
+số với một đơn vị, giá trị thiếu ghi là \texttt{NA}, và GTX 1080 Ti có số TMUs đúng.
 
 \begin{table}[!htbp]
   \centering
