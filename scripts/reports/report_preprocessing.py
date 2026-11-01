@@ -13,6 +13,7 @@ Outputs (report/generated/):
 
 import logging
 
+import numpy as np
 import pandas as pd
 from scipy import stats
 
@@ -86,6 +87,48 @@ def identity_mismatches(parsed: pd.DataFrame) -> dict[str, int]:
         "TextureMismatchAfter": after["texture_rate_mismatch"],
         "BandwidthMismatchBefore": before["bandwidth_mismatch"],
         "BandwidthMismatchAfter": after["bandwidth_mismatch"],
+    }
+
+
+def decimal(value: float, digits: int = 1) -> str:
+    """Number with a fixed number of decimals and a decimal comma."""
+    return f"{value:.{digits}f}".replace(".", ",")
+
+
+def ci_half_width(values: pd.Series) -> float:
+    """Half-width of the 95% t confidence interval for the mean."""
+    n = len(values)
+    return stats.t.ppf(0.975, n - 1) * values.std() / np.sqrt(n)
+
+
+def imputation_effect(analysis: pd.DataFrame) -> dict[str, str]:
+    """Compare dropping missing values with filling them by the median.
+
+    Shows what median imputation would do to the spread, the confidence
+    interval and the power-clock correlation, to justify not imputing.
+    """
+    power = analysis["max_power_w"].astype("float64")
+    clock = analysis["core_speed_mhz"].astype("float64")
+    power_filled = power.fillna(power.median())
+    clock_filled = clock.fillna(clock.median())
+    both = power.notna() & clock.notna()
+    log_power = np.log(power.clip(lower=1))
+    return {
+        "PowerSdDropped": decimal(power.std()),
+        "PowerSdImputed": decimal(power_filled.std()),
+        "PowerCiDropped": decimal(ci_half_width(power.dropna())),
+        "PowerCiImputed": decimal(ci_half_width(power_filled)),
+        "PowerAtMedianDropped": percent(
+            power.eq(power.median()).sum(), power.notna().sum()
+        ),
+        "PowerAtMedianImputed": percent(
+            power_filled.eq(power.median()).sum(), len(power)
+        ),
+        "CorrDropped": decimal(log_power[both].corr(np.log(clock[both])), digits=2),
+        "CorrImputed": decimal(
+            log_power[power.notna()].corr(np.log(clock_filled[power.notna()])),
+            digits=2,
+        ),
     }
 
 
@@ -205,6 +248,7 @@ def numbers() -> dict[str, str | int]:
         "Desktop": int(analysis["segment"].eq("Desktop").sum()),
         "Laptop": int(analysis["segment"].eq("Laptop").sum()),
         **missingness(analysis),
+        **imputation_effect(analysis),
         **missing_by_column(analysis),
     }
 
