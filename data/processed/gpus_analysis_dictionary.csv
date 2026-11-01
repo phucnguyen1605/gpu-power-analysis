@@ -1,0 +1,17 @@
+column,role,used_in,dtype,missing,missing_pct,description
+gpu_id,identifier,all analyses,int64,0,0.0,Row position in the raw file (0-based)
+name,identifier,all analyses,str,0,0.0,Product name
+manufacturer,grouping,descriptive statistics; two-group comparison; ANOVA; regression,category,0,0.0,GPU vendor
+segment,grouping,descriptive statistics; two-group comparison; ANOVA; regression,category,0,0.0,Desktop or Laptop
+memory_type,grouping,descriptive statistics,category,20,0.7,Memory technology
+memory_type_group,grouping,descriptive statistics; ANOVA,category,20,0.7,Memory technology; types with under 30 cards of known power pooled into 'Other'
+architecture,cluster,regression,str,41,1.5,GPU chip; cards sharing a chip are not independent observations
+release_year,time,descriptive statistics; out-of-sample validation,Int64,30,1.1,Release year
+max_power_w,response,all analyses,Float64,481,17.4,Rated maximum power (W)
+needs_aux_power,derived_response,descriptive statistics; confidence interval for a proportion,boolean,481,17.4,max_power_w above the 75 W a PCIe slot supplies
+texture_rate_per_watt,derived_response,descriptive statistics; discussion,Float64,668,24.2,Energy efficiency: texture fill rate (GTexel/s) per watt
+tmus,predictor,descriptive statistics; regression; out-of-sample validation,Float64,358,13.0,Texture mapping units
+core_speed_mhz,predictor,descriptive statistics; regression; out-of-sample validation,Float64,608,22.0,Base core clock (MHz)
+memory_bandwidth_gb_s,predictor,descriptive statistics; regression; out-of-sample validation,Float64,37,1.3,Memory bandwidth (GB/s)
+memory_mb,predictor,descriptive statistics; regression; out-of-sample validation,Float64,26,0.9,Video memory (MB)
+process_nm,predictor,descriptive statistics; regression; out-of-sample validation,Float64,291,10.5,Manufacturing process (nm)

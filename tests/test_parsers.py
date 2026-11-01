@@ -64,6 +64,18 @@ def test_parse_yes_no_rejects_other_values():
         ("Quadro K2200", ""),
         ("Radeon R9 280X Sapphire Dual-X 3GB OC Edition", ""),
         ("Radeon R7 265 PowerColor TurboDuo OC 2GB Edition", ""),
+        ("GeForce 9800 GX2", "x2_board"),
+        ("Radeon HD 6870 PowerColor X2 Edition", "x2_board"),
+        ("Radeon RX 580 HIS IceQ X2 OC 8GB", ""),
+        ("GeForce GTX 1050 Inno3D Twin X2 2GB", ""),
+        ("Tesla K10", "dual_chip_model"),
+        ("FirePro S10000", "dual_chip_model"),
+        ("Quadro NVS 420", "dual_chip_model"),
+        ("NVS 4200M", ""),
+        ("Radeon HD 6990", "dual_chip_model"),
+        ("Radeon HD 6990M", ""),
+        ("Radeon HD 7970 Asus ARES II Edition", "dual_chip_model"),
+        ("GeForce GTX 660 Ti Colorful iGame ARES X 2GB Edition", ""),
     ],
 )
 def test_multi_gpu_rules(name, expected):

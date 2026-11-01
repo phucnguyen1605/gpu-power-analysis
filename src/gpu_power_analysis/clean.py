@@ -5,22 +5,17 @@ want to exclude are flagged, never removed, so any research question on this
 dataset can start from it.
 
 Steps:
-    1. read_raw                 read text, trim whitespace, mark missing values
-    2. find_multi_gpu_candidates  propose multi-GPU products from their names
-    3. apply_review             take the final decision from the manual review
-    4. parse_columns            convert every column to its proper type
-    5. add_flags                flag multi-GPU, unreleased and duplicate rows
-    6. describe_columns         build the data dictionary
+    1. read_raw          read text, trim whitespace, mark missing values
+    2. parse_columns     convert every column to its proper type
+    3. add_flags         flag multi-GPU, unreleased and duplicate rows
+    4. describe_columns  build the data dictionary
 """
 
-import logging
 from pathlib import Path
 
 import pandas as pd
 
 from gpu_power_analysis import parsers, paths
-
-logger = logging.getLogger(__name__)
 
 # Cell contents that mean "not recorded", in any column.
 MISSING_TOKENS = ["", "-"]
@@ -29,21 +24,23 @@ UNKNOWN_DATE = "Unknown Release Date"
 # Text that was mis-encoded in the raw file (UTF-8 read as Latin-1).
 ENCODING_FIXES = {"Â²": "²"}
 
-# Name patterns of multi-GPU products. Each rule is narrow on purpose: words
-# such as "Quad", "Dual" or "Duo" also appear in single-GPU names ("Quadro",
-# "Dual-X" coolers, "TurboDuo"), and every candidate is reviewed by hand.
+# Name patterns of multi-GPU products (SLI/CrossFire setups, dual-GPU boards,
+# AMD Dual Graphics). Every match was checked by hand against the specs in the
+# data (a dual board lists twice the TMUs and bus width of its single sibling).
+# The rules are narrow on purpose: "Quad", "Dual", "Duo" and "X2" also appear in
+# single-GPU names ("Quadro", "Dual-X", "TurboDuo", "IceQ X2" and "Twin X2"
+# coolers), "HD 6990M" is a single laptop chip and "ARES X" is a Colorful model.
 MULTI_GPU_RULES = {
     "sli_crossfire": r"(?i)\bSLI\b|\bcross ?fire\b|\b[2-4]-way\b",
     "hybrid_graphics": r"\s\+\s",
-    "x2_board": r"(?i)\d\s?X2\b",
+    "x2_board": r"(?i)\d\s?X2\b|\bGX2\b|PowerColor X2 Edition",
     "quadro_plex": r"\bPlex\b",
     "dual_chip_model": (
-        r"(?i)GTX 690|GTX 590|GTX 295|Titan Z\b|HD 5970|HD 6990|HD 7990|HD 8990"
-        r"|Pro Duo|Devil 13|\bARES\b|\bMARS\b|R9 295"
+        r"(?i)GTX 690|GTX 590|GTX 295|Titan Z\b|HD 5970|HD 6990(?!M)|HD 7990"
+        r"|HD 8990|Pro Duo|Devil 13|\bARES\b(?! X)|\bMARS\b|R9 295"
+        r"|Tesla K10\b|FirePro S10000|NVS 4[25]0\b"
     ),
 }
-
-REVIEW_COLUMNS = ["gpu_id", "name", "matched_rules", "exclude", "reviewed", "note"]
 
 # Clean column -> (raw column it comes from, meaning). Also fixes column order.
 COLUMNS = {
@@ -94,7 +91,7 @@ COLUMNS = {
     "open_gl": ("Open_GL", "OpenGL version"),
     "shader_model": ("Shader", "Shader Model version, e.g. '5.0' (not a core count)"),
     "multi_gpu_rules": ("Name", "Multi-GPU name rules matched, if any"),
-    "is_multi_gpu": ("Name", "Multi-GPU product, per the manual review"),
+    "is_multi_gpu": ("Name", "Multi-GPU product: a name rule matched"),
     "is_unreleased": ("Name", "Marked '[not released]'"),
     "is_exact_duplicate": ("", "Identical to an earlier row on every raw column"),
 }
@@ -104,7 +101,7 @@ def read_raw(path: Path) -> pd.DataFrame:
     """Step 1: read every column as text, trim it and mark missing values.
 
     Reading as text means no value is converted before its format is checked
-    in step 4.
+    in step 2.
     """
     raw = pd.read_csv(path, dtype="str", keep_default_na=False)
     raw = raw.apply(lambda column: column.str.strip())
@@ -123,47 +120,8 @@ def match_multi_gpu_rules(names: pd.Series) -> pd.Series:
     return matches.apply(lambda row: ",".join(row.index[row]), axis=1)
 
 
-def find_multi_gpu_candidates(raw: pd.DataFrame) -> pd.DataFrame:
-    """Step 2: list rows whose name matches a multi-GPU rule."""
-    rules = match_multi_gpu_rules(raw["Name"])
-    candidates = raw.loc[rules != "", ["gpu_id", "Name"]].rename(
-        columns={"Name": "name"}
-    )
-    return candidates.assign(
-        matched_rules=rules[rules != ""], exclude=True, reviewed=False, note=""
-    )[REVIEW_COLUMNS]
-
-
-def apply_review(candidates: pd.DataFrame, review_path: Path) -> set[int]:
-    """Step 3: decide which rows are multi-GPU, using the manual review file.
-
-    The review file is the authority. A reviewer sets ``exclude`` to False for
-    a false positive, or adds a row for a product no rule found. Candidates
-    not yet in the file count as multi-GPU. On the first run the file is
-    created from the candidates.
-
-    Returns:
-        ``gpu_id`` values of multi-GPU products.
-    """
-    if not review_path.exists():
-        candidates.to_csv(review_path, index=False)
-        logger.warning("Created %s; review it by hand", review_path)
-    review = pd.read_csv(
-        review_path,
-        dtype={"gpu_id": "int64", "exclude": "boolean", "reviewed": "boolean"},
-    )
-    not_in_file = candidates.loc[~candidates["gpu_id"].isin(review["gpu_id"])]
-    not_reviewed = review.loc[~review["reviewed"].fillna(False)]
-    if len(not_in_file):
-        logger.warning("%d candidates missing from the review file", len(not_in_file))
-    if len(not_reviewed):
-        logger.warning("%d rows of the review file not reviewed yet", len(not_reviewed))
-    excluded = review.loc[review["exclude"].fillna(True), "gpu_id"]
-    return set(excluded) | set(not_in_file["gpu_id"])
-
-
 def parse_columns(raw: pd.DataFrame) -> pd.DataFrame:
-    """Step 4: convert every raw column into its proper type."""
+    """Step 2: convert every raw column into its proper type."""
     num = parsers.parse_number
     best_resolution = parsers.parse_resolution(raw["Best_Resolution"])
     max_resolution = parsers.parse_resolution(raw["Resolution_WxH"])
@@ -247,14 +205,13 @@ def check_consistency(clean: pd.DataFrame, tolerance: float = 0.1) -> dict[str, 
     }
 
 
-def add_flags(
-    clean: pd.DataFrame, raw: pd.DataFrame, multi_gpu_ids: set[int]
-) -> pd.DataFrame:
-    """Step 5: flag rows a study may want to exclude; no row is removed."""
+def add_flags(clean: pd.DataFrame, raw: pd.DataFrame) -> pd.DataFrame:
+    """Step 3: flag rows a study may want to exclude; no row is removed."""
     raw_columns = [column for column in raw.columns if column != "gpu_id"]
+    rules = match_multi_gpu_rules(raw["Name"])
     flagged = clean.assign(
-        multi_gpu_rules=match_multi_gpu_rules(raw["Name"]),
-        is_multi_gpu=clean["gpu_id"].isin(multi_gpu_ids).astype("boolean"),
+        multi_gpu_rules=rules,
+        is_multi_gpu=(rules != "").astype("boolean"),
         is_unreleased=raw["Name"]
         .str.contains(r"(?i)\[not released\]")
         .astype("boolean"),
@@ -264,7 +221,7 @@ def add_flags(
 
 
 def describe_columns(clean: pd.DataFrame) -> pd.DataFrame:
-    """Step 6: data dictionary with source, type and missing share per column."""
+    """Step 4: data dictionary with source, type and missing share per column."""
     return pd.DataFrame(
         {
             "column": list(COLUMNS),
