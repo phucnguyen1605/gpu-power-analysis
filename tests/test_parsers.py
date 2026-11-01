@@ -63,6 +63,8 @@ def test_parse_yes_no_rejects_other_values():
         ("Radeon HD 6990M", ""),
         ("Radeon HD 7970 Asus ARES II Edition", "dual_chip_model"),
         ("GeForce GTX 660 Ti Colorful iGame ARES X 2GB Edition", ""),
+        ("GeForce GTX 960 Gigabyte WindForce 2X OC 4GB Edition", ""),
+        ("Radeon RX 580 HIS IceQ X2 OC 8GB", ""),
     ],
 )
 def test_multi_gpu_rules(name, expected):
@@ -72,6 +74,12 @@ def test_multi_gpu_rules(name, expected):
 def test_parse_multiplier_defaults_to_one():
     result = parsers.parse_multiplier(text(["16 (x2)", "32", None]))
     assert result.tolist() == [2.0, 1.0, 1.0]
+
+
+def test_parse_multiplier_rejects_unknown_formats():
+    for value in ["16 x2", "16 (x2) ", "(x2)", "16 (x0)", "sixteen"]:
+        with pytest.raises(ValueError):
+            parsers.parse_multiplier(text([value]))
 
 
 def test_parse_number_rejects_other_currency_and_separators():

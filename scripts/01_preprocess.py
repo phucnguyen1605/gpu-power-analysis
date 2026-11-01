@@ -31,26 +31,26 @@ EXAMPLE_COLUMNS = {
 
 
 def main() -> None:
-    """Run the seven preprocessing steps and write the outputs."""
+    """Run the six preprocessing steps and write the outputs."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     paths.PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
     raw = pre.read_raw(paths.RAW_GPUS)
     logger.info(
-        "Step 1/7  read raw file as text: %d rows x %d columns",
+        "Step 1/6  read raw file as text: %d rows x %d columns",
         len(raw),
         raw.shape[1] - 1,
     )
 
     selected = pre.select_columns(raw)
     logger.info(
-        "Step 2/7  kept %d of %d columns", selected.shape[1] - 1, raw.shape[1] - 1
+        "Step 2/6  kept %d of %d columns", selected.shape[1] - 1, raw.shape[1] - 1
     )
 
     cleaned = pre.clean_text(selected)
     newly_missing = int(cleaned.isna().sum().sum() - selected.isna().sum().sum())
     logger.info(
-        "Step 3/7  trimmed text; %d placeholder cells marked as missing", newly_missing
+        "Step 3/6  trimmed text; %d placeholder cells marked as missing", newly_missing
     )
 
     parsed = pre.parse_columns(cleaned)
@@ -59,7 +59,7 @@ def main() -> None:
     single_gpu = pre.match_multi_gpu_rules(cleaned["Name"]).eq("")
     example = parsed.index[parsed["spec_multiplier"].gt(1) & single_gpu][0]
     logger.info(
-        "Step 4/7  parsed units and types; example: %s", parsed.at[example, "name"]
+        "Step 4/6  parsed units and types; example: %s", parsed.at[example, "name"]
     )
     for raw_column, column in EXAMPLE_COLUMNS.items():
         logger.info(
@@ -75,7 +75,7 @@ def main() -> None:
     )
 
     rows, row_counts = pre.filter_rows(parsed)
-    logger.info("Step 5/7  filter rows:")
+    logger.info("Step 5/6  filter rows:")
     for step in row_counts.itertuples():
         logger.info(
             "            %-26s %5d rows  (-%d)", step.step, step.rows, step.removed
@@ -83,7 +83,7 @@ def main() -> None:
 
     analysis = pre.derive_variables(rows)
     logger.info(
-        "Step 6/7  derived variables: desktop %d, laptop %d; needs auxiliary power %d",
+        "Step 6/6  derived variables: desktop %d, laptop %d; needs auxiliary power %d",
         int(analysis["segment"].eq("Desktop").sum()),
         int(analysis["segment"].eq("Laptop").sum()),
         int(analysis["needs_aux_power"].sum()),
@@ -100,7 +100,7 @@ def main() -> None:
     dictionary.to_csv(paths.ANALYSIS_DICTIONARY, index=False)
     row_counts.to_csv(paths.ROW_COUNTS, index=False)
     logger.info(
-        "Step 7/7  wrote %d rows x %d columns to %s; max_power_w missing in %d rows",
+        "Output    wrote %d rows x %d columns to %s; max_power_w missing in %d rows",
         *analysis.shape,
         paths.ANALYSIS_PARQUET.relative_to(paths.ROOT),
         int(analysis["max_power_w"].isna().sum()),

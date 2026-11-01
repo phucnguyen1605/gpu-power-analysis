@@ -4,7 +4,7 @@ The numbers are written as LaTeX macros, so the report text is regenerated with
 the data instead of being typed by hand.
 
 Usage:
-    python scripts/report_preprocessing.py
+    python scripts/reports/report_preprocessing.py
 
 Outputs (report/generated/):
     preprocessing_numbers.tex           numbers quoted in the text, as macros
@@ -27,7 +27,7 @@ SAMPLE_ROWS_OUTPUT = GENERATED / "preprocessing_sample_rows.tex"
 
 # Cards shown after preprocessing: an old card, one missing power, one with the
 # "(xN)" TMUs repair and one missing core speed.
-SAMPLE_GPU_IDS = [1721, 1679, 2227, 1434]
+SAMPLE_GPU_IDS = [1721, 1679, 2180, 1434]
 SAMPLE_COLUMNS = {
     "name": "{}",
     "release_year": "{:d}",
@@ -63,12 +63,29 @@ def raw_text_counts() -> dict[str, int]:
     }
 
 
-def texture_mismatches(parsed: pd.DataFrame) -> dict[str, int]:
-    """Rows breaking the texture-rate identity before and after the TMUs repair."""
-    undone = parsed.assign(tmus=parsed["tmus"] / parsed["spec_multiplier"])
+def identity_mismatches(parsed: pd.DataFrame) -> dict[str, int]:
+    """Rows breaking each identity before and after the "(xN)" repair."""
+    undone = parsed.assign(
+        tmus=parsed["tmus"] / parsed["spec_multiplier"],
+        memory_bus_bit=parsed["memory_bus_bit"] / parsed["spec_multiplier"],
+    )
+    before = pre.check_consistency(undone)
+    after = pre.check_consistency(parsed)
+    repaired = parsed["spec_multiplier"].gt(1)
+    no_clock = parsed["boost_clock_mhz"].isna() & parsed["core_speed_mhz"].isna()
+    bandwidth_before = pre.consistency_flags(undone)["bandwidth_mismatch"]
+    bandwidth_after = pre.consistency_flags(parsed)["bandwidth_mismatch"]
     return {
-        "TextureMismatchBefore": pre.check_consistency(undone)["texture_rate_mismatch"],
-        "TextureMismatchAfter": pre.check_consistency(parsed)["texture_rate_mismatch"],
+        "TextureUntestable": int((repaired & no_clock).sum()),
+        "BandwidthMismatchNotRepaired": int((bandwidth_before & ~repaired).sum()),
+        # Flagged only because the faulty rows skewed their memory type's median.
+        "BandwidthMismatchShifted": int(
+            (bandwidth_before & ~repaired & ~bandwidth_after).sum()
+        ),
+        "TextureMismatchBefore": before["texture_rate_mismatch"],
+        "TextureMismatchAfter": after["texture_rate_mismatch"],
+        "BandwidthMismatchBefore": before["bandwidth_mismatch"],
+        "BandwidthMismatchAfter": after["bandwidth_mismatch"],
     }
 
 
@@ -92,6 +109,9 @@ def missingness(analysis: pd.DataFrame) -> dict[str, str | int]:
         "MissingAmdPct": percent((missing & amd).sum(), (missing & major).sum()),
         "ObservedAmdPct": percent((~missing & amd).sum(), (~missing & major).sum()),
         "MissingMakerP": p_value(maker_test.pvalue),
+        "AtiCards": int(analysis["manufacturer"].eq("ATI").sum()),
+        "AtiMissing": int((missing & analysis["manufacturer"].eq("ATI")).sum()),
+        "IntelCards": int(analysis["manufacturer"].eq("Intel").sum()),
     }
 
 
@@ -129,7 +149,8 @@ def numbers() -> dict[str, str | int]:
     """Every number the preprocessing section quotes, keyed by macro name."""
     raw = pre.read_raw(paths.RAW_GPUS)
     selected = pre.select_columns(raw)
-    parsed = pre.parse_columns(pre.clean_text(selected))
+    cleaned = pre.clean_text(selected)
+    parsed = pre.parse_columns(cleaned)
     rows, row_counts = pre.filter_rows(parsed)
     analysis = pre.derive_variables(rows)
     counts = dict(zip(row_counts["step"], row_counts["rows"], strict=True))
@@ -137,14 +158,49 @@ def numbers() -> dict[str, str | int]:
         "RowsRaw": len(raw),
         "ColsRaw": raw.shape[1] - 1,
         "ColsSelected": selected.shape[1] - 1,
+        "CellsMarkedMissing": int(cleaned.isna().sum().sum()),
+        "ReleaseYearMin": int(analysis["release_year"].min()),
+        "ReleaseYearMax": int(analysis["release_year"].max()),
         **raw_text_counts(),
-        **texture_mismatches(parsed),
+        **identity_mismatches(parsed),
+        "EncodingFixed": int(
+            selected["Name"]
+            .str.contains("|".join(pre.ENCODING_FIXES), regex=True)
+            .sum()
+        ),
+        "RepairedInFinal": int(
+            parsed.set_index("gpu_id")
+            .loc[analysis["gpu_id"], "spec_multiplier"]
+            .gt(1)
+            .sum()
+        ),
+        "NotebookYes": int(parsed["is_notebook"].eq(True).sum()),
+        "NotebookNo": int(parsed["is_notebook"].eq(False).sum()),
+        "ManufacturerLevels": parsed["manufacturer"].nunique(),
+        "ManufacturerNames": ", ".join(parsed["manufacturer"].value_counts().index),
+        "MemoryTypeLevels": parsed["memory_type"].nunique(),
+        "MemoryTypeMissing": int(parsed["memory_type"].isna().sum()),
+        "MemoryTypeLevelsFinal": analysis["memory_type"].nunique(),
+        "MemoryTypeGroups": analysis["memory_type_group"].nunique(),
+        "MemoryTypeOtherNames": ", ".join(
+            sorted(
+                analysis.loc[
+                    analysis["memory_type_group"].eq(pre.OTHER), "memory_type"
+                ].unique()
+            )
+        ),
         "Integrated": int(parsed["is_dedicated"].eq(False).sum()),
         "UnknownDedicated": int(parsed["is_dedicated"].isna().sum()),
         "RowsDedicated": counts["dedicated GPU"],
         "RowsSingleGpu": counts["not a multi-GPU product"],
         "RowsReleased": counts["released"],
         "RowsFinal": counts["not an exact duplicate"],
+        "MultiGpuRemoved": counts["dedicated GPU"] - counts["not a multi-GPU product"],
+        "UnreleasedRemoved": counts["not a multi-GPU product"] - counts["released"],
+        "DuplicatesRemoved": counts["released"] - counts["not an exact duplicate"],
+        "LaptopAuxPower": int(
+            analysis.loc[analysis["segment"].eq("Laptop"), "needs_aux_power"].sum()
+        ),
         "ColsFinal": analysis.shape[1],
         "Desktop": int(analysis["segment"].eq("Desktop").sum()),
         "Laptop": int(analysis["segment"].eq("Laptop").sum()),
@@ -156,7 +212,9 @@ def numbers() -> dict[str, str | int]:
 def main() -> None:
     """Write the macros file and the sample-rows table body."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    header = "% Generated by scripts/report_preprocessing.py; do not edit by hand.\n"
+    header = (
+        "% Generated by scripts/reports/report_preprocessing.py; do not edit by hand.\n"
+    )
     lines = [
         f"\\newcommand{{\\Pre{name}}}{{{value}}}" for name, value in numbers().items()
     ]

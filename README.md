@@ -19,11 +19,17 @@ pip install -e . --no-deps           # để import được package gpu_power_a
 ## Chạy
 
 ```bash
-python scripts/01_preprocess.py         # tiền xử lý: dữ liệu thô -> dữ liệu cho đề tài
-python scripts/report_preprocessing.py  # số liệu cho mục tiền xử lý của báo cáo (LaTeX)
-pytest                                  # chạy test
-ruff format . && ruff check .           # format và kiểm tra code trước khi commit
+python scripts/01_preprocess.py                  # tiền xử lý: dữ liệu thô -> dữ liệu cho đề tài
+python scripts/reports/report_preprocessing.py   # số liệu cho mục tiền xử lý của báo cáo (LaTeX)
+(cd report && tectonic preview_section3.tex)     # xem trước mục 3 (cần cài Tectonic)
+pytest                                           # chạy test
+ruff format . && ruff check .                    # format và kiểm tra code trước khi commit
 ```
+
+Dữ liệu gốc `data/raw/All_GPUs.csv` có sẵn trong repo, không cần tải từ Kaggle. Các file
+sinh ra (`data/processed/`, `report/generated/`, `report/preview_section3.pdf`) cũng được
+lưu trong git để cả nhóm dùng ngay mà không cần chạy code. **Khi sửa code, chạy lại các
+lệnh trên và commit các file sinh ra cùng với code.**
 
 ## Cấu trúc
 
@@ -35,8 +41,14 @@ gpu-power-analysis/
 ├── src/gpu_power_analysis/
 │   ├── paths.py                         đường dẫn tới mọi file
 │   ├── parsers.py                       các hàm đổi chuỗi thành số, ngày, Yes/No
-│   └── preprocess.py                    7 bước tiền xử lý, mỗi bước một hàm
-├── scripts/01_preprocess.py             chạy tiền xử lý, in kết quả từng bước
+│   └── preprocess.py                    6 bước tiền xử lý, mỗi bước một hàm
+├── scripts/
+│   ├── 01_preprocess.py                 chạy tiền xử lý, in kết quả từng bước
+│   └── reports/report_preprocessing.py  sinh số liệu cho mục 3 của báo cáo
+├── report/
+│   ├── sections/03_preprocessing.tex    mục 3 (Tiền xử lý số liệu)
+│   ├── generated/                       macro số liệu và bảng mẫu (do script sinh ra)
+│   └── preview_section3.tex             file xem trước mục 3
 ├── tests/test_parsers.py                test cho các hàm đọc giá trị
 └── tests/test_preprocess.py             test cho quy trình tiền xử lý
 ```
@@ -50,8 +62,10 @@ gpu-power-analysis/
 | 3 | `clean_text` | Xóa khoảng trắng; đổi ô trống, `"-"`, `"Unknown Release Date"` thành giá trị thiếu; sửa lỗi mã hóa tên | `"\n01-Mar-2009 "` → `"01-Mar-2009"` |
 | 4 | `parse_columns` | Tách đơn vị, đổi kiểu, sửa lỗi `(xN)`; **gặp định dạng lạ thì dừng và báo lỗi**; `check_consistency` kiểm tra kết quả | `"738 MHz"` → 738; `"800MB/sec"` → 0,8; TMUs `56` → 224 khi ROPs ghi `"24 (x4)"` |
 | 5 | `filter_rows` | Giữ GPU rời → bỏ cấu hình nhiều GPU → bỏ card chưa phát hành → bỏ dòng trùng | 3406 → 3018 → 2775 → 2762 → 2762 dòng |
-| 6 | `derive_variables` | Thêm `segment`, `needs_aux_power` (trên 75 W), `texture_rate_per_watt`, `memory_type_group` (gộp các loại có dưới 30 card **có số liệu công suất** thành "Other"); giữ 16 cột cuối | 2318 desktop, 444 laptop |
-| 7 | `describe_columns` | Từ điển dữ liệu, có cột `role` (vai trò) và `used_in` (phân tích sử dụng) | 16 cột |
+| 6 | `derive_variables` | Thêm `segment`, `needs_aux_power` (trên 75 W, chỉ có ý nghĩa với card desktop), `texture_rate_per_watt`, `memory_type_group` (gộp các loại có dưới 30 card **có số liệu công suất** thành "Other"); giữ 16 cột cuối | 2318 desktop, 444 laptop |
+
+Sau 6 bước, `describe_columns` tạo từ điển dữ liệu (cột `role`: vai trò, `used_in`: phân
+tích sử dụng) rồi script ghi các file đầu ra.
 
 **Đầu ra** (`data/processed/`):
 
@@ -70,10 +84,19 @@ gpu-power-analysis/
 - **Chỉ dùng trong lúc xử lý:** `Dedicated` (lọc GPU rời), `ROPs` (lấy hệ số N để sửa
   lỗi `(xN)`), `Texture_Rate` (kiểm tra lỗi, tính hiệu quả năng lượng), `Boost_Clock`,
   `Memory_Bus`, `Memory_Speed` (kiểm tra lỗi).
-- 16 cột còn lại của dữ liệu gốc (cổng xuất hình, độ phân giải, phiên bản API, giá bán,
-  bộ nguồn khuyến nghị, L2 cache…) không liên quan tới đề tài nên không được xử lý. Cần
-  thêm cột nào thì thêm vào `USED_COLUMNS`, viết dòng chuyển đổi trong `parse_columns`
-  và khai báo trong `COLUMNS`.
+- 16 cột còn lại của dữ liệu gốc không được xử lý:
+  - cổng xuất hình, độ phân giải, phiên bản DirectX/OpenGL, giá bán: không liên quan tới
+    đề tài;
+  - `PSU`, `Power_Connector`: được chọn **sau khi** đã biết công suất, đưa vào mô hình là
+    rò rỉ thông tin của biến mục tiêu;
+  - `Pixel_Rate`: bằng ROPs × xung nhịp, trùng thông tin với `TMUs` và `Core_Speed`;
+  - `Shader`: là phiên bản shader (như 5.0), không phải số nhân xử lý;
+  - `L2_Cache`: nhiều card ghi "0KB", nhiều khả năng là không có số liệu;
+  - `Integrated`: trùng thông tin với `Dedicated`;
+  - `SLI_Crossfire`: chỉ cho biết card *hỗ trợ* ghép nhiều card.
+
+  Cần thêm cột nào thì thêm vào `USED_COLUMNS`, viết dòng chuyển đổi trong
+  `parse_columns` và khai báo trong `COLUMNS`.
 
 ### Nhận diện cấu hình nhiều GPU (bước 5)
 
@@ -83,13 +106,14 @@ họa lai AMD Dual Graphics) được nhận diện **tự động** bằng 5 lu
 
 | Luật | Dấu hiệu | Số dòng |
 |---|---|---|
-| `sli_crossfire` | "SLI", "CrossFire", "3-Way" | 180 |
+| `sli_crossfire` | "SLI", "CrossFire", "2-Way"/"3-Way"/"4-Way" | 180 |
 | `dual_chip_model` | Danh sách mẫu card hai chip đã biết: GTX 690/590/295, Titan Z, HD 5970/6990/7990/8990, Radeon Pro Duo, Devil 13, ARES, MARS, R9 295X2, Tesla K10, FirePro S10000, Quadro NVS 420/450 | 41 |
 | `hybrid_graphics` | Tên có dấu "+" (APU + card rời) | 20 |
 | `x2_board` | Số hiệu kết thúc bằng "X2", "GX2", "PowerColor X2 Edition" | 14 |
 | `quadro_plex` | Quadro Plex (hệ đồ họa ngoài) | 1 |
 
-Tổng cộng **246 dòng** (một dòng có thể khớp nhiều luật).
+Tổng cộng **246 dòng** trong dữ liệu gốc (một dòng có thể khớp nhiều luật). Bước 5 loại
+**243 dòng**, vì 3 dòng đã bị loại trước đó do là GPU tích hợp.
 
 **Cách xây dựng luật:** mọi dòng khớp luật đã được **kiểm tra thủ công**
 bằng thông số trong chính dữ liệu: card hai chip có TMUs và độ rộng bus gấp đôi card
@@ -105,12 +129,14 @@ bằng thông số trong chính dữ liệu: card hai chip có TMUs và độ r�
 - **Ở 305 dòng có ROPs dạng `"a (xN)"`, cột `TMUs` và `Memory_Bus` bị ghi chia cho
   N** (ký hiệu `(xN)` chỉ còn ở ROPs). Bằng chứng: `Texture_Rate` = TMUs × xung nhịp
   và băng thông = bus × tốc độ bộ nhớ chỉ khớp sau khi nhân lại với N. Code nhân lại.
-  Ví dụ GTX 1080 Ti: TMUs 56 → 224, bus 88 → 352 bit.
+  Ví dụ GTX 1080 Ti Zotac Founders Edition (ROPs `"22 (x4)"`): TMUs 56 → 224, bus 88 →
+  352 bit, khớp với dòng GeForce GTX 1080 Ti bản tham chiếu.
 - `Texture_Rate` được tính theo **xung boost** khi card có boost, và được làm tròn tới số
   nguyên trong file gốc.
 - `Memory_Speed` không so sánh được giữa các loại bộ nhớ: băng thông = bus/8 ×
   tốc độ × k, với k = 1 (DDR), 2 (DDR2/DDR3), 4 (GDDR5), 8 (GDDR5X).
-- Script tự kiểm tra hai đẳng thức trên ở bước 4 và báo số dòng không khớp. Hiện còn
+- Script tự kiểm tra hai đẳng thức trên ở bước 4 (một dòng không khớp nếu hai vế lệch
+  nhau quá 10%) và báo số dòng không khớp. Hiện còn
   4 dòng băng thông không khớp, đều là cấu hình SLI (băng thông của hai card cộng lại),
   bị loại ở bước 5.
 - Một tên sản phẩm bị lỗi mã hóa ký tự (`"XÂ²"`) được sửa thành `"X²"`.
