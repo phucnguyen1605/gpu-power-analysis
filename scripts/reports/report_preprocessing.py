@@ -95,6 +95,11 @@ def decimal(value: float, digits: int = 1) -> str:
     return f"{value:.{digits}f}".replace(".", ",")
 
 
+def math_decimal(value: float, digits: int = 2) -> str:
+    """Decimal comma for use inside LaTeX math, where a bare comma adds a space."""
+    return decimal(value, digits).replace(",", "{,}")
+
+
 def ci_half_width(values: pd.Series) -> float:
     """Half-width of the 95% t confidence interval for the mean."""
     n = len(values)
@@ -104,15 +109,11 @@ def ci_half_width(values: pd.Series) -> float:
 def imputation_effect(analysis: pd.DataFrame) -> dict[str, str]:
     """Compare dropping missing values with filling them by the median.
 
-    Shows what median imputation would do to the spread, the confidence
-    interval and the power-clock correlation, to justify not imputing.
+    Shows what median imputation would do to the mean, the spread and the
+    confidence interval of power, to justify not imputing.
     """
     power = analysis["max_power_w"].astype("float64")
-    clock = analysis["core_speed_mhz"].astype("float64")
     power_filled = power.fillna(power.median())
-    clock_filled = clock.fillna(clock.median())
-    both = power.notna() & clock.notna()
-    log_power = np.log(power.clip(lower=1))
     predictors = [
         "tmus",
         "core_speed_mhz",
@@ -125,6 +126,8 @@ def imputation_effect(analysis: pd.DataFrame) -> dict[str, str]:
         "RowsWithPowerAndPredictors": int(
             analysis[["max_power_w", *predictors]].notna().all(axis=1).sum()
         ),
+        "PowerMeanDropped": decimal(power.mean()),
+        "PowerMeanImputed": decimal(power_filled.mean()),
         "PowerSdDropped": decimal(power.std()),
         "PowerSdImputed": decimal(power_filled.std()),
         "PowerCiDropped": decimal(ci_half_width(power.dropna())),
@@ -135,34 +138,50 @@ def imputation_effect(analysis: pd.DataFrame) -> dict[str, str]:
         "PowerAtMedianImputed": percent(
             power_filled.eq(power.median()).sum(), len(power)
         ),
-        "CorrDropped": decimal(log_power[both].corr(np.log(clock[both])), digits=2),
-        "CorrImputed": decimal(
-            log_power[power.notna()].corr(np.log(clock_filled[power.notna()])),
-            digits=2,
-        ),
     }
+
+
+def two_mean_z_test(first: pd.Series, second: pd.Series) -> tuple[float, float]:
+    """Large-sample z test for equal means (two-sided), as taught in the course."""
+    se = np.sqrt(first.var() / len(first) + second.var() / len(second))
+    z = (first.mean() - second.mean()) / se
+    return z, 2 * stats.norm.sf(abs(z))
+
+
+def two_proportion_z_test(
+    hits: tuple[int, int], sizes: tuple[int, int]
+) -> tuple[float, float]:
+    """Pooled z test for equal proportions (two-sided), as taught in the course."""
+    rates = [hit / size for hit, size in zip(hits, sizes, strict=True)]
+    pooled = sum(hits) / sum(sizes)
+    se = np.sqrt(pooled * (1 - pooled) * (1 / sizes[0] + 1 / sizes[1]))
+    z = (rates[0] - rates[1]) / se
+    return z, 2 * stats.norm.sf(abs(z))
 
 
 def missingness(analysis: pd.DataFrame) -> dict[str, str | int]:
     """Compare cards with and without max_power_w to describe why power is missing."""
     missing = analysis["max_power_w"].isna()
     years = analysis["release_year"].astype("float64")
-    year_test = stats.mannwhitneyu(
-        years[missing].dropna(), years[~missing].dropna(), alternative="two-sided"
-    )
+    missing_years = years[missing].dropna()
+    observed_years = years[~missing].dropna()
+    year_z, year_p = two_mean_z_test(missing_years, observed_years)
     major = analysis["manufacturer"].isin(["Nvidia", "AMD"])
-    maker = analysis.loc[major, "manufacturer"].astype("str")
-    maker_test = stats.chi2_contingency(pd.crosstab(maker, missing[major]))
     amd = analysis["manufacturer"].eq("AMD")
+    amd_hits = (int((missing & amd).sum()), int((~missing & amd).sum()))
+    major_sizes = (int((missing & major).sum()), int((~missing & major).sum()))
+    maker_z, maker_p = two_proportion_z_test(amd_hits, major_sizes)
     return {
         "PowerMissing": int(missing.sum()),
         "PowerMissingPct": percent(missing.sum(), len(analysis)),
-        "MissingMedianYear": int(years[missing].median()),
-        "ObservedMedianYear": int(years[~missing].median()),
-        "MissingYearP": p_value(year_test.pvalue),
-        "MissingAmdPct": percent((missing & amd).sum(), (missing & major).sum()),
-        "ObservedAmdPct": percent((~missing & amd).sum(), (~missing & major).sum()),
-        "MissingMakerP": p_value(maker_test.pvalue),
+        "MissingMeanYear": decimal(missing_years.mean()),
+        "ObservedMeanYear": decimal(observed_years.mean()),
+        "MissingYearZ": math_decimal(year_z),
+        "MissingYearP": p_value(year_p),
+        "MissingAmdPct": percent(amd_hits[0], major_sizes[0]),
+        "ObservedAmdPct": percent(amd_hits[1], major_sizes[1]),
+        "MissingMakerZ": math_decimal(maker_z),
+        "MissingMakerP": p_value(maker_p),
         "AtiCards": int(analysis["manufacturer"].eq("ATI").sum()),
         "AtiMissing": int((missing & analysis["manufacturer"].eq("ATI")).sum()),
         "IntelCards": int(analysis["manufacturer"].eq("Intel").sum()),

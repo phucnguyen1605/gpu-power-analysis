@@ -395,65 +395,66 @@ có số TMUs đúng.
 % ---------------------------------------------------------------------
 \subsection{Xử lý dữ liệu khuyết}
 
-\textbf{Kết quả.} Nhóm \emph{không điền} giá trị khuyết. Bộ dữ liệu cuối vẫn giữ các ô
-\texttt{NA} (tỉ lệ khuyết của từng cột ở Bảng~\ref{tab:columns}); khi phân tích, mỗi phân
-tích chỉ dùng những dòng có đủ các biến mà nó cần. Ví dụ:
+\textbf{Cách xử lý.} Nhóm không điền giá trị khuyết. Bộ dữ liệu cuối giữ nguyên các ô
+\texttt{NA} (tỉ lệ khuyết của từng cột ở Bảng~\ref{tab:columns}). Khi làm một phân tích,
+nhóm chỉ bỏ những dòng bị khuyết ở các biến mà phân tích đó dùng. Ví dụ:
 \begin{itemize}
-  \item phân tích chỉ cần công suất dùng được \PreRowsWithPower{} trong \PreRowsFinal{}
-    card (bỏ \PrePowerMissing{} card khuyết công suất);
+  \item tính khoảng tin cậy cho công suất trung bình chỉ cần biến công suất, nên dùng được
+    \PreRowsWithPower{} trong \PreRowsFinal{} card;
   \item phân tích cần công suất và cả năm biến giải thích dùng được
     \PreRowsWithPowerAndPredictors{} card.
 \end{itemize}
-Như vậy phân tích dùng càng nhiều biến thì càng còn ít dòng, nhưng không dòng nào bị bỏ
-oan vì khuyết một biến mà phân tích không dùng.
 
-\textbf{Vì sao không điền.} Có ba cách xử lý dữ liệu khuyết thường dùng: (1) bỏ các dòng
-khuyết; (2) điền bằng trung bình hoặc trung vị của các giá trị không khuyết; (3) điền bằng
-một giá trị cố định khác. Cách (3) không phù hợp, vì một giá trị như 0~W hay 0~MHz không có
-ý nghĩa với GPU. Bảng~\ref{tab:imputation} so sánh cách (1) và cách (2) trên chính dữ liệu
-của nhóm.
+\textbf{Vì sao không điền.} Có ba cách xử lý dữ liệu khuyết: (1) bỏ các dòng khuyết;
+(2) điền bằng trung bình hoặc trung vị của các giá trị không khuyết; (3) điền bằng một giá
+trị cố định. Cách (3) không dùng được, vì một giá trị như 0~W không có ý nghĩa với GPU. Để
+so sánh cách (1) và cách (2), nhóm tính các đặc trưng mẫu của công suất theo hai cách
+(Bảng~\ref{tab:imputation}).
 
 \begin{table}[H]
   \centering
-  \caption{So sánh bỏ dòng khuyết và điền trung vị}
+  \caption{Đặc trưng mẫu của công suất khi bỏ dòng khuyết và khi điền trung vị}
   \label{tab:imputation}
   \small
   \begin{tabular}{l r r}
     \toprule
-    \textbf{Đại lượng} & \textbf{Bỏ dòng khuyết} & \textbf{Điền trung vị} \\
+    \textbf{Đặc trưng} & \textbf{Bỏ dòng khuyết} & \textbf{Điền trung vị} \\
     \midrule
-    Độ lệch chuẩn mẫu $s$ của công suất (W) & \PrePowerSdDropped & \PrePowerSdImputed \\
-    Độ chính xác $\varepsilon$ của KTC 95\% cho công suất trung bình (W)
+    Cỡ mẫu $n$ & \PreRowsWithPower & \PreRowsFinal \\
+    Trung bình mẫu $\bar{x}$ (W) & \PrePowerMeanDropped & \PrePowerMeanImputed \\
+    Độ lệch chuẩn mẫu $s$ (W) & \PrePowerSdDropped & \PrePowerSdImputed \\
+    Độ chính xác $\varepsilon$ của khoảng tin cậy 95\% (W)
       & \PrePowerCiDropped & \PrePowerCiImputed \\
-    Tỉ lệ card có công suất đúng bằng trung vị (\%)
+    Tỉ lệ card có công suất bằng trung vị (\%)
       & \PrePowerAtMedianDropped & \PrePowerAtMedianImputed \\
-    Hệ số tương quan giữa log công suất và log xung nhịp
-      & \PreCorrDropped & \PreCorrImputed \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Điền trung vị gây ra ba vấn đề:
-\begin{itemize}
-  \item \PrePowerAtMedianImputed\% card có cùng một công suất, trong khi các giá trị này
-    không phải số đo thật;
-  \item độ lệch chuẩn $s$ và độ chính xác $\varepsilon$ nhỏ đi, nên khoảng tin cậy trông
-    chính xác hơn thực tế và kiểm định dễ bác bỏ $H_0$ sai hơn (tăng sai lầm loại I);
-  \item hệ số tương quan bị kéo về 0, nên hồi quy sẽ đánh giá thấp ảnh hưởng của xung
-    nhịp tới công suất.
-\end{itemize}
-Riêng biến mục tiêu \texttt{max\_power\_w}, điền giá trị vào còn có nghĩa là tự tạo ra
-chính kết quả cần phân tích.
+\textbf{Nhận xét.} Trung bình mẫu gần như không đổi, nhưng độ lệch chuẩn giảm từ
+\PrePowerSdDropped{} xuống \PrePowerSdImputed~W và độ chính xác $\varepsilon$ giảm từ
+\PrePowerCiDropped{} xuống \PrePowerCiImputed~W. Lý do là \PrePowerMissing{} giá trị điền
+vào đều bằng trung vị, nên \PrePowerAtMedianImputed\% card có cùng một công suất và dữ liệu
+trông ít phân tán hơn thực tế. Khi đó khoảng tin cậy hẹp hơn mức đúng, và kiểm định dễ bác
+bỏ $H_0$ khi $H_0$ đúng (sai lầm loại I). Ngoài ra, công suất là biến mục tiêu của đề tài;
+điền giá trị vào là tự tạo ra chính số liệu cần phân tích. Vì vậy nhóm chọn cách (1).
 
-\textbf{Lưu ý khi diễn giải.} Bỏ dòng khuyết chỉ không gây chệch nếu card khuyết giống các
-card còn lại. Điều này không hoàn toàn đúng: card khuyết công suất nhìn chung là card đời
-cũ hơn (trung vị năm phát hành \PreMissingMedianYear{} so với \PreObservedMedianYear{},
-kiểm định Mann--Whitney, $p$ \PreMissingYearP) và, trong số card Nvidia và AMD, có tỉ lệ
-AMD cao hơn (\PreMissingAmdPct\% so với \PreObservedAmdPct\%, kiểm định khi bình phương,
-$p$ \PreMissingMakerP). ATI (\PreAtiCards{} card, \PreAtiMissing{} card khuyết công suất)
-và Intel (\PreIntelCards{} card) không đưa vào phép so sánh theo hãng. Đây là dạng thiên
-kiến không phản hồi: phần tử thiếu số liệu khác phần tử có số liệu. Vì vậy các kết quả về
-công suất đại diện nhiều hơn cho card đời mới.
+\textbf{Lưu ý.} Cách bỏ dòng khuyết chỉ cho kết quả đúng nếu card bị khuyết giống các card
+còn lại. Nhóm kiểm tra điều này bằng hai kiểm định hai mẫu, mức ý nghĩa 5\%:
+\begin{itemize}
+  \item năm phát hành trung bình của card khuyết công suất là \PreMissingMeanYear, của
+    card có công suất là \PreObservedMeanYear; kiểm định so sánh hai trung bình cho
+    $z = \PreMissingYearZ$, $p$ \PreMissingYearP;
+  \item trong số card Nvidia và AMD, tỉ lệ card AMD ở nhóm khuyết công suất là
+    \PreMissingAmdPct\%, ở nhóm có công suất là \PreObservedAmdPct\%; kiểm định so sánh hai
+    tỉ lệ cho $z = \PreMissingMakerZ$, $p$ \PreMissingMakerP. ATI (\PreAtiCards{} card,
+    \PreAtiMissing{} card khuyết công suất) và Intel (\PreIntelCards{} card) không đưa vào
+    phép so sánh này.
+\end{itemize}
+Cả hai kiểm định đều bác bỏ $H_0$: card khuyết công suất là card đời cũ hơn và có nhiều
+card AMD hơn. Đây là thiên kiến không phản hồi, tức những phần tử thiếu số liệu có đặc điểm
+khác những phần tử có số liệu. Vì vậy các kết quả về công suất đại diện nhiều hơn cho card
+đời mới.
 
 % ---------------------------------------------------------------------
 \subsection{Các hàm chính và cấu trúc dữ liệu}
