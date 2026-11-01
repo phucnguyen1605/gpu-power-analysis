@@ -101,9 +101,8 @@ def math_decimal(value: float, digits: int = 2) -> str:
 
 
 def ci_half_width(values: pd.Series) -> float:
-    """Half-width of the 95% t confidence interval for the mean."""
-    n = len(values)
-    return stats.t.ppf(0.975, n - 1) * values.std() / np.sqrt(n)
+    """Half-width of the 95% large-sample (z) confidence interval for the mean."""
+    return stats.norm.ppf(0.975) * values.std() / np.sqrt(len(values))
 
 
 def imputation_effect(analysis: pd.DataFrame) -> dict[str, str]:
