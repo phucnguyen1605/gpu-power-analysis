@@ -2,10 +2,10 @@
 % Mục 3. Tiền xử lý số liệu
 %
 % Gói cần có trong file chính: booktabs, tabularx, array, listings, xcolor,
-%   tikz (thư viện positioning, arrows.meta), caption.
+%   tikz (thư viện positioning, arrows.meta), caption, float.
 % Trước khi \input file này, file chính phải nạp các con số do code sinh ra:
 %   \input{generated/preprocessing_numbers.tex}
-% (tạo bằng: python scripts/report_preprocessing.py; script này cũng sinh
+% (tạo bằng: python scripts/reports/report_preprocessing.py; script này cũng sinh
 % generated/preprocessing_sample_rows.tex cho bảng dữ liệu mẫu). Mọi con số
 % trong lời văn đều là macro \Pre..., nên chạy lại code là báo cáo tự cập nhật.
 % Không tham chiếu số mục hay số bảng của mục khác (cấu trúc báo cáo chưa chốt);
@@ -20,29 +20,38 @@ Phần này trình bày quá trình chuyển tệp \texttt{All\_GPUs.csv} (\PreR
 các phân tích ở mục sau. Toàn bộ quy trình viết bằng Python (thư viện
 \texttt{pandas}), chạy lại được từ đầu và cho cùng một kết quả. Quy trình gồm sáu bước:
 đọc dữ liệu, chọn biến, làm sạch chuỗi, xử lý định dạng, lọc quan sát và tạo biến mới
-(Hình~\ref{fig:preprocess}).
+(Hình~\ref{fig:preprocess}, kèm tên hàm thực hiện mỗi bước).
 
-Nhóm tuân theo ba nguyên tắc: không sửa tay dữ liệu gốc; mỗi hàm đọc giá trị chỉ chấp
+Nhóm tuân theo ba nguyên tắc: không sửa tay dữ liệu gốc; mỗi hàm đọc biến số chỉ chấp
 nhận đúng định dạng đã biết và dừng chương trình nếu gặp giá trị lạ; không điền giá trị
 cho biến mục tiêu \texttt{Max\_Power}. Ngoại lai và biến đổi logarit được xử lý trong
 từng phân tích ở các mục sau, vì mỗi phân tích cần một cách xử lý khác nhau.
+
+Tên biến trong tệp gốc viết hoa, như \texttt{Max\_Power}; tên cột sau xử lý viết thường
+và kèm đơn vị, như \texttt{max\_power\_w}. Giá trị khuyết được ghi là \texttt{NA}.
 
 \begin{figure}[!htb]
   \centering
   \begin{tikzpicture}[
       node distance=3.5mm,
       box/.style={rectangle, rounded corners, draw, thick, fill=blue!6,
-        text width=7.5cm, align=center, minimum height=7mm, font=\footnotesize},
-      io/.style={rectangle, draw, thick, fill=orange!12, text width=7.5cm,
+        text width=9cm, align=center, minimum height=7mm, font=\footnotesize},
+      io/.style={rectangle, draw, thick, fill=orange!12, text width=9cm,
         align=center, minimum height=7mm, font=\footnotesize},
       arrow/.style={-Stealth, thick}]
     \node[io] (raw) {Tệp gốc \texttt{All\_GPUs.csv}: \PreRowsRaw{} dòng $\times$ \PreColsRaw{} biến};
-    \node[box, below=of raw] (read) {1. Đọc mọi cột dưới dạng chuỗi};
-    \node[box, below=of read] (select) {2. Chọn \PreColsSelected{} biến cần cho đề tài};
-    \node[box, below=of select] (clean) {3. Xóa khoảng trắng, đánh dấu giá trị thiếu};
-    \node[box, below=of clean] (parse) {4. Tách đơn vị, đổi kiểu, sửa lỗi ``(x$N$)''};
-    \node[box, below=of parse] (filter) {5. Lọc: GPU rời, một GPU, đã phát hành, không trùng};
-    \node[box, below=of filter] (derive) {6. Tạo biến mới, giữ các cột cần dùng};
+    \node[box, below=of raw] (read) {1. Đọc mọi cột dưới dạng chuỗi
+      (\texttt{read\_raw})};
+    \node[box, below=of read] (select) {2. Chọn \PreColsSelected{} biến cần cho đề tài
+      (\texttt{select\_columns})};
+    \node[box, below=of select] (clean) {3. Xóa khoảng trắng, đánh dấu giá trị khuyết, sửa lỗi mã hóa
+      (\texttt{clean\_text})};
+    \node[box, below=of clean] (parse) {4. Tách đơn vị, đổi kiểu, sửa lỗi ``(x$N$)''
+      (\texttt{parse\_columns}, \texttt{check\_consistency})};
+    \node[box, below=of parse] (filter) {5. Lọc: GPU rời, một GPU, đã phát hành, không trùng
+      (\texttt{filter\_rows})};
+    \node[box, below=of filter] (derive) {6. Tạo biến mới, giữ các cột cần dùng
+      (\texttt{derive\_variables})};
     \node[io, below=of derive] (final) {Dữ liệu cho đề tài: \PreRowsFinal{} dòng $\times$
       \PreColsFinal{} cột};
     \foreach \a/\b in {raw/read, read/select, select/clean, clean/parse,
@@ -54,20 +63,25 @@ từng phân tích ở các mục sau, vì mỗi phân tích cần một cách x
 \end{figure}
 
 % ---------------------------------------------------------------------
-\subsection{Đọc dữ liệu}
+\subsection{Bước 1: Đọc dữ liệu}
 
-Mọi cột được đọc dưới dạng chuỗi, chưa chuyển đổi giá trị nào, để từng giá trị đều được
-kiểm tra định dạng ở các bước sau. Mỗi dòng được gán mã \texttt{gpu\_id} là vị trí của
-dòng trong tệp gốc để truy vết.
+Mọi cột của tệp gốc được đọc dưới dạng chuỗi, chưa chuyển đổi giá trị nào, để mọi giá trị
+đều đi qua bước làm sạch và kiểm tra định dạng ở bước 3 và bước 4. Mỗi dòng là một mẫu
+card và được gán mã \texttt{gpu\_id} là vị trí của dòng trong tệp gốc, để từ một dòng
+trong dữ liệu cuối có thể tìm lại đúng dòng gốc.
 
 \begin{lstlisting}[language=Python, caption={Đọc dữ liệu thô dưới dạng chuỗi}]
 raw = pd.read_csv(path, dtype="str", keep_default_na=False)
 \end{lstlisting}
 
-% ---------------------------------------------------------------------
-\subsection{Chọn biến}
+Kết quả: \PreRowsRaw{} dòng $\times$ \PreColsRaw{} biến, toàn bộ là chuỗi, thêm cột
+\texttt{gpu\_id}.
 
-Trong \PreColsRaw{} biến gốc, nhóm chỉ giữ \PreColsSelected{} biến cần cho đề tài:
+% ---------------------------------------------------------------------
+\subsection{Bước 2: Chọn biến}
+
+Trong \PreColsRaw{} biến gốc, nhóm chỉ giữ \PreColsSelected{} biến cần cho câu hỏi nghiên
+cứu, chia thành ba loại:
 {\sloppy
 \begin{itemize}
   \item biến mục tiêu \texttt{Max\_Power} và các biến giải thích \texttt{TMUs},
@@ -76,86 +90,171 @@ Trong \PreColsRaw{} biến gốc, nhóm chỉ giữ \PreColsSelected{} biến c�
     \texttt{Notebook\_GPU}, \texttt{Memory\_Type}, \texttt{Release\_Date},
     \texttt{Architecture};
   \item các biến chỉ dùng trong lúc xử lý: \texttt{Dedicated} (lọc GPU rời),
-    \texttt{ROPs} (sửa lỗi ``(x$N$)'' ở bước xử lý định dạng), \texttt{Texture\_Rate} (kiểm tra lỗi và
+    \texttt{ROPs} (sửa lỗi ``(x$N$)'' ở bước 4), \texttt{Texture\_Rate} (kiểm tra lỗi và
     tính hiệu quả năng lượng), \texttt{Boost\_Clock}, \texttt{Memory\_Bus},
     \texttt{Memory\_Speed} (kiểm tra lỗi).
 \end{itemize}
 \par}
-Các biến còn lại như cổng xuất hình, độ phân giải, phiên bản DirectX, giá bán hay bộ
-nguồn khuyến nghị không liên quan tới câu hỏi nghiên cứu nên bị bỏ. Tỉ lệ khuyết không
-được dùng làm tiêu chí chọn biến, vì chính biến mục tiêu \texttt{Max\_Power} cũng thiếu
-khá nhiều.
+Trong đó, \texttt{TMUs} (texture mapping units) là số đơn vị xử lý texture, phản ánh quy
+mô bộ xử lý của GPU; \texttt{ROPs} (render output units) là số đơn vị ghi điểm ảnh vào bộ
+nhớ khung hình; \texttt{Texture\_Rate} là tốc độ xử lý texture, bằng TMUs nhân xung nhịp.
+
+Các biến về cổng xuất hình, độ phân giải, phiên bản DirectX và OpenGL hay giá bán không
+liên quan tới câu hỏi nghiên cứu nên bị bỏ. \texttt{Integrated} trùng thông tin với
+\texttt{Dedicated} (ngược nghĩa). \texttt{L2\_Cache} có nhiều card ghi ``0KB'', nhiều khả
+năng là không có số liệu. \texttt{SLI\_Crossfire} chỉ cho biết card \emph{hỗ trợ} ghép
+nhiều card, không cho biết dòng đó có phải cấu hình ghép hay không, nên cấu hình ghép được
+nhận diện qua tên ở bước 5. Bốn biến sau tuy có vẻ hữu ích nhưng cũng bị bỏ:
+\texttt{PSU} (bộ nguồn khuyến nghị) và \texttt{Power\_Connector} (đầu cắm nguồn phụ) được
+nhà sản xuất chọn sau khi đã biết công suất của card, nên đưa chúng vào mô hình sẽ làm mô
+hình dự đoán công suất tốt một cách giả tạo; \texttt{Pixel\_Rate} bằng số ROPs nhân xung
+nhịp, tức cũng phản ánh quy mô chip và xung nhịp, vốn đã có trong \texttt{TMUs} và
+\texttt{Core\_Speed}; \texttt{Shader} là phiên bản shader (như 5.0) chứ không phải số nhân
+xử lý. Biến được chọn theo ý nghĩa, không theo tỉ lệ khuyết, và được chọn trước khi làm
+sạch để các bước sau chỉ xử lý những biến thật sự dùng đến.
+
+Kết quả: \PreRowsRaw{} dòng $\times$ \PreColsSelected{} biến (chưa tính \texttt{gpu\_id}).
 
 % ---------------------------------------------------------------------
-\subsection{Làm sạch chuỗi}
+\subsection{Bước 3: Làm sạch chuỗi}
 
-{\sloppy Các biến được chọn chứa nhiều giá trị không chuẩn: có các ký tự xuống dòng và khoảng
-trắng thừa (ngày phát hành ghi dạng \verb|"\n01-Mar-2009 "|), ký hiệu \verb|"-"| thay
-cho giá trị thiếu (\PreCoreSpeedDash{} giá trị của \texttt{Core\_Speed}, cùng
-\PreCoreSpeedBlank{} giá trị chỉ chứa ký tự trắng) và \PreUnknownReleaseDate{} giá trị ghi
-\verb|"Unknown Release Date"|. Nhóm xóa khoảng trắng hai đầu, rồi đổi các ký hiệu trên
-thành giá trị thiếu chuẩn \texttt{NA}.\par}
+{\sloppy Các biến được chọn chứa nhiều giá trị không chuẩn. Ô khuyết của
+\texttt{Core\_Speed} ghi \verb|"\n- "| (\PreCoreSpeedDash{} ô) hoặc chỉ chứa ký tự xuống
+dòng (\PreCoreSpeedBlank{} ô); ô khuyết của \texttt{Release\_Date} ghi
+\verb|"\nUnknown Release Date "| (\PreUnknownReleaseDate{} ô); các ngày còn lại cũng có ký
+tự xuống dòng và khoảng trắng thừa, như \verb|"\n01-Mar-2009 "|. Ngoài ra có
+\PreEncodingFixed{} dòng ở biến \texttt{Name} bị lỗi mã hóa ký tự (\verb|"Â²"| thay cho \verb|"²"|). Bước này
+làm ba việc theo thứ tự:\par}
+\begin{enumerate}
+  \item xóa khoảng trắng và ký tự xuống dòng ở hai đầu mỗi giá trị, để
+    \verb|"\n01-Mar-2009 "| thành \verb|"01-Mar-2009"| và một ô chỉ có ký tự trắng thành
+    chuỗi rỗng;
+  \item đổi chuỗi rỗng, \verb|"-"| và \verb|"Unknown Release Date"| thành \texttt{NA};
+  \item sửa lỗi mã hóa \verb|"Â²"| thành \verb|"²"|.
+\end{enumerate}
 
-\begin{lstlisting}[language=Python, caption={Xóa khoảng trắng và đánh dấu giá trị thiếu}]
+\begin{lstlisting}[language=Python, caption={Xóa khoảng trắng và đánh dấu giá trị khuyết}]
 text = selected.apply(lambda column: column.str.strip())
 text = text.replace(["", "-"], pd.NA)
 text["Release_Date"] = text["Release_Date"].replace(
     "Unknown Release Date", pd.NA)
 \end{lstlisting}
 
-\textbf{Nhận xét.} Nếu chỉ đếm dữ liệu trống như mặc định của \texttt{pandas}, tỉ lệ thiếu
-của \texttt{Core\_Speed} và \texttt{Release\_Date} sẽ bị đánh giá thấp. Vì vậy mọi tỉ lệ
-thiếu trong mục này đều được tính sau khi đã đổi các ký hiệu trên thành \texttt{NA}.
+Kết quả: \PreCellsMarkedMissing{} ô được đánh dấu \texttt{NA}; các ô còn lại là chuỗi
+không còn khoảng trắng thừa.
+
+\textbf{Nhận xét.} Nếu đọc tệp theo mặc định, \texttt{pandas} đếm được 0 giá trị khuyết ở
+\texttt{Core\_Speed} và \texttt{Release\_Date}, vì các ô khuyết ở đây chứa chuỗi chứ không
+để trống. Vì vậy mọi tỉ lệ khuyết trong mục này đều được tính sau bước 3.
 
 % ---------------------------------------------------------------------
-\subsection{Xử lý định dạng}
+\subsection{Bước 4: Xử lý định dạng}
 
-Phần lớn biến số được ghi kèm đơn vị. Nhóm tách phần số và đổi sang kiểu số theo mẫu
-định dạng riêng của từng biến (Bảng~\ref{tab:formats}); giá trị nào không khớp mẫu thì
-chương trình dừng và báo lỗi. Cách xóa mọi ký tự không phải chữ số tuy đơn giản hơn
-nhưng cho kết quả sai ở hai trường hợp: \verb|"800MB/sec"| còn lại 800 và bị hiểu là
-800~GB/s thay vì 0,8~GB/s; \verb|"16 (x2)"| còn lại các chữ số ``162'' thay vì
-$16 \times 2 = 32$.
+Sau bước 3, các biến số vẫn là chuỗi có kèm đơn vị, như \verb|"141 Watts"| hay
+\verb|"64GB/sec"|. Với mỗi biến số, nhóm viết một mẫu định dạng riêng, tách phần số ra và
+đổi sang kiểu số; giá trị nào không khớp mẫu thì chương trình dừng và báo lỗi, nên không
+có giá trị nào bị đổi sai một cách âm thầm. Riêng \texttt{ROPs} có thể ghi dạng
+``$a$ (x$N$)'', nghĩa là $a \times N$; ở các dòng này \texttt{TMUs} và
+\texttt{Memory\_Bus} bị ghi chia cho $N$ và được nhân lại (xem phần sửa lỗi bên dưới).
+Cách xóa mọi ký tự không phải chữ số tuy đơn giản hơn nhưng cho kết quả sai ở hai trường
+hợp: \verb|"800MB/sec"| còn lại 800 và bị hiểu là 800~GB/s thay vì 0,8~GB/s;
+\verb|"16 (x2)"| còn lại các chữ số ``162'' thay vì $16 \times 2 = 32$.
+Bảng~\ref{tab:formats} liệt kê cách đổi của từng biến.
 
-\begin{table}[!htbp]
+\begin{table}[H]
   \centering
-  \caption{Một số định dạng gốc và kết quả chuyển đổi}
+  \caption{Cách chuyển đổi từng biến ở bước 4}
   \label{tab:formats}
-  \small
-  \begin{tabular}{>{\ttfamily}l >{\ttfamily}l l}
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabularx}{\linewidth}{>{\ttfamily}l >{\ttfamily}l
+      >{\raggedright\arraybackslash}X >{\ttfamily\raggedright\arraybackslash}l}
     \toprule
-    \normalfont\textbf{Biến gốc} & \normalfont\textbf{Giá trị gốc} & \textbf{Sau chuyển đổi} \\
+    \normalfont\textbf{Biến gốc} & \normalfont\textbf{Ví dụ gốc}
+      & \textbf{Cách đổi} & \normalfont\textbf{Cột mới} \\
     \midrule
-    Max\_Power        & 141 Watts       & 141 (W) \\
-    Core\_Speed       & 738 MHz         & 738 (MHz) \\
-    Memory\_Bandwidth & 64GB/sec        & 64 (GB/s) \\
-    Memory\_Bandwidth & 800MB/sec       & 0,8 (GB/s) \\
-    Process           & 55nm            & 55 (nm) \\
-    ROPs              & 16 (x2)         & 32 \\
-    Release\_Date     & 01-Mar-2009     & năm 2009 \\
+    Max\_Power & 141 Watts & bỏ ``Watts'', đổi sang số & max\_power\_w \\
+    Core\_Speed & 738 MHz & bỏ ``MHz'', đổi sang số & core\_speed\_mhz \\
+    Boost\_Clock & 1100 MHz & như trên & boost\_clock\_mhz \\
+    Memory\_Speed & 1000 MHz & như trên & memory\_speed\_mhz \\
+    Memory & 1024 MB & bỏ ``MB'', đổi sang số & memory\_mb \\
+    Memory\_Bandwidth & 64GB/sec & bỏ đơn vị, đổi sang số & memory\_bandwidth\_gb\_s \\
+                      & 800MB/sec & bỏ đơn vị, chia 1000 & \\
+    Process & 55nm & bỏ ``nm'', đổi sang số & process\_nm \\
+    Texture\_Rate & 47 GTexel/s & bỏ đơn vị, đổi sang số & texture\_rate\_gtexel\_s \\
+    ROPs & 16 (x2) & lấy hệ số $N$ (không có thì $N = 1$) & \normalfont(dùng để sửa lỗi) \\
+    TMUs & 64 & đổi sang số, nhân $N$ & tmus \\
+    Memory\_Bus & 256 Bit & bỏ ``Bit'', đổi sang số, nhân $N$ & memory\_bus\_bit \\
+    Release\_Date & 01-Mar-2009 & đọc dạng ngày, lấy năm & release\_year \\
+    Dedicated & Yes / No & Yes $\to$ đúng, No $\to$ sai & is\_dedicated \\
+    Notebook\_GPU & Yes / No & như trên & is\_notebook \\
+    Manufacturer & Nvidia & chuyển sang kiểu phân loại & manufacturer \\
+    Memory\_Type & GDDR5 & như trên & memory\_type \\
+    Name & GeForce GTS 150 & giữ nguyên dạng chuỗi & name \\
+    Architecture & Tesla G92b & như trên & architecture \\
     \bottomrule
-  \end{tabular}
+  \end{tabularx}
 \end{table}
 
-\textbf{Nhận xét.}
+{\sloppy\textbf{Nhận xét.}
 \begin{itemize}
-  \item \PreBandwidthInMb{} dòng ghi băng thông theo MB/sec được đổi sang GB/s.
-  \item Các biến định tính \texttt{Manufacturer} và \texttt{Memory\_Type} được chuyển sang
-    kiểu phân loại (\texttt{category}, tương đương \texttt{factor} trong R) để dùng làm
-    biến phân nhóm.
-  \item Giá trị dạng ``$a$ (x$N$)'' (\PreRopsMultiplier{} dòng của \texttt{ROPs}) là phép
-    nhân: Radeon RX~580 ghi \verb|"16 (x2)"| và có $16 \times 2 = 32$ ROPs.
-  \item Ở đúng các dòng này, \texttt{TMUs} bị ghi chia cho $N$. Bằng chứng là tốc
-    độ xử lý texture phải bằng TMUs nhân xung nhịp, nhưng \PreTextureMismatchBefore{} dòng
-    không thỏa; sau khi nhân lại với $N$ thì còn \PreTextureMismatchAfter{} dòng. Ví dụ
-    GTX 1080 Ti được ghi 56 TMUs, giá trị đúng là 224. Theo nguyên tắc làm sạch dữ liệu,
-    giá trị sai được sửa khi tìm được giá trị đúng \cite{vandenbroeck2005}; ở đây giá
-    trị đúng tính được từ chính các cột khác của dòng đó. \texttt{TMUs} (số đơn vị xử lý
-    texture) phản ánh độ lớn của GPU và là một biến giải thích công suất trong mô hình
-    hồi quy, nên nếu không sửa, các card đời 2016--2017 sẽ bị xem như card nhỏ hơn nhiều
-    so với thực tế. \texttt{Memory\_Bus} cũng bị chia cho $N$ ở các dòng này và được sửa
-    theo cùng cách.
+  \item \PreBandwidthInMb{} dòng ghi băng thông theo MB/sec được đổi sang GB/s (chia 1000,
+    vì nhà sản xuất ghi băng thông theo hệ thập phân).
+  \item \texttt{Release\_Date} gốc là chuỗi gồm ngày, tháng viết tắt tiếng Anh và năm, nối
+    bằng dấu gạch, như \verb|"01-Mar-2009"|. Chuỗi được đọc thành kiểu ngày tháng theo
+    đúng mẫu này, rồi lấy phần năm và lưu thành số nguyên \texttt{release\_year}
+    (\PreReleaseYearMin--\PreReleaseYearMax{} trong dữ liệu cuối). Nhóm chỉ giữ năm vì các
+    phân tích sau chia mẫu theo năm, không cần đến tháng; các ô \texttt{NA} vẫn là
+    \texttt{NA}.
+  \item \texttt{Dedicated} và \texttt{Notebook\_GPU} gốc là chuỗi \verb|"Yes"| hoặc
+    \verb|"No"|, được đổi sang kiểu đúng/sai (\texttt{is\_dedicated},
+    \texttt{is\_notebook}) để dùng trực tiếp trong điều kiện lọc và khi đếm.
+    \texttt{Dedicated} có \PreUnknownDedicated{} ô khuyết, giữ là \texttt{NA} và bị loại
+    ở bước 5. \texttt{Notebook\_GPU} không có ô khuyết (\PreNotebookYes{} Yes,
+    \PreNotebookNo{} No) và được dùng ở bước 6 để tạo \texttt{segment}.
+  \item \texttt{Manufacturer} và \texttt{Memory\_Type} là biến định tính, được chuyển sang
+    kiểu phân loại (\texttt{category}, tương đương \texttt{factor} trong R), tức mỗi giá
+    trị khác nhau là một nhóm. \texttt{Manufacturer} có \PreManufacturerLevels{} nhóm
+    (\PreManufacturerNames); Intel chỉ có \PreIntelCards{} card trong dữ liệu cuối, nên cách
+    mã hóa biến này trong mô hình hồi quy do phần hồi quy quyết định.
+    \texttt{Memory\_Type} có \PreMemoryTypeLevels{} nhóm trong dữ liệu gốc
+    (\PreMemoryTypeLevelsFinal{} nhóm trong dữ liệu cuối) và \PreMemoryTypeMissing{} ô
+    khuyết; nhiều nhóm rất nhỏ nên được gộp lại ở bước 6.
 \end{itemize}
+\par}
+
+{\sloppy\textbf{Sửa lỗi ``(x$N$)''.} \PreRopsMultiplier{} dòng ghi \texttt{ROPs} dạng
+``$a$ (x$N$)''. Đây là phép nhân: Radeon RX~580 ghi \verb|"16 (x2)"| và có
+$16 \times 2 = 32$ ROPs. Ở đúng các dòng này, \texttt{TMUs} và \texttt{Memory\_Bus} bị
+ghi chia cho $N$. Ví dụ dòng GTX~1080~Ti Zotac Founders Edition ghi ROPs là
+\verb|"22 (x4)"| và 56 TMUs, trong khi dòng GeForce GTX~1080~Ti (bản tham chiếu) ghi 88
+ROPs và 224 TMUs;
+nhân lại với $N = 4$ được đúng 224. Có hai bằng chứng, đều do hàm
+\texttt{check\_consistency} kiểm tra. Một dòng được coi là không thỏa nếu hai vế lệch
+nhau quá 10\% (với tốc độ texture, cho phép thêm sai số làm tròn 0,5~GTexel/s, vì tệp
+gốc ghi giá trị này dạng số nguyên):\par}
+\begin{itemize}
+  \item Tốc độ xử lý texture bằng TMUs nhân xung nhịp (xung nhịp tăng tốc nếu có,
+    nếu không thì xung nhịp cơ bản). Trong \PreRopsMultiplier{} dòng có hệ số $N$,
+    \PreTextureMismatchBefore{} dòng không thỏa đẳng thức này; \PreTextureUntestable{}
+    dòng còn lại không có xung nhịp nên không kiểm tra được. Sau khi nhân lại với $N$,
+    còn \PreTextureMismatchAfter{} dòng không thỏa.
+  \item Băng thông bộ nhớ bằng độ rộng bus nhân tốc độ bộ nhớ, nhân một hệ số theo
+    loại bộ nhớ. Hệ số này được ước lượng bằng trung vị của từng loại bộ nhớ, nên chính các
+    dòng lỗi cũng làm lệch nó. Trước khi sửa có \PreBandwidthMismatchBefore{} dòng không
+    thỏa: toàn bộ \PreRopsMultiplier{} dòng có hệ số $N$ và
+    \PreBandwidthMismatchNotRepaired{} dòng khác. Sau khi sửa, \PreBandwidthMismatchShifted{}
+    trong \PreBandwidthMismatchNotRepaired{} dòng khác này thỏa lại vì hệ số hết bị lệch; còn \PreBandwidthMismatchAfter{} dòng
+    không thỏa, đều là cấu hình SLI cho laptop bị loại ở bước 5.
+\end{itemize}
+Theo nguyên tắc làm sạch dữ liệu, giá trị sai được sửa khi tìm được giá trị đúng
+\cite{vandenbroeck2005}; ở đây giá trị đúng tính được từ chính các cột khác của dòng đó.
+Nếu không sửa, các card bị lỗi sẽ bị xem như card nhỏ hơn nhiều so với thực tế trong mô
+hình hồi quy, vì \texttt{TMUs} là một biến giải thích. Phần lớn các dòng có hệ số $N$ là
+cấu hình nhiều GPU và bị loại ở bước 5; dữ liệu cuối còn \PreRepairedInFinal{} dòng đã
+được sửa, đều là card phát hành năm 2016--2017. \texttt{Max\_Power} không bị chia cho $N$:
+ở hai chip có cả dòng bị lỗi lẫn dòng không lỗi (GP102, ghi trong dữ liệu là ``Pascal P102'', và Baffin PRO), công suất
+trung vị của hai loại dòng bằng nhau (220~W và 75~W).
 
 \begin{lstlisting}[language=Python, caption={Sửa lỗi ``(x$N$)'': nhân lại TMUs và Memory\_Bus với $N$}]
 multiplier = parse_multiplier(selected["ROPs"])  # "16 (x2)" -> 2, "64" -> 1
@@ -163,24 +262,37 @@ tmus = parse_number(selected["TMUs"]) * multiplier
 memory_bus_bit = parse_number(selected["Memory_Bus"], "Bit") * multiplier
 \end{lstlisting}
 
+Kết quả: vẫn \PreRowsRaw{} dòng; mọi biến số đã ở kiểu số với một đơn vị thống nhất, và
+số ô \texttt{NA} của mỗi biến không đổi so với bước 3 (riêng \texttt{ROPs} được thay bằng
+hệ số $N$, ô khuyết cho $N = 1$).
+
 % ---------------------------------------------------------------------
-\subsection{Lọc quan sát}
-\label{sec:filter}
+\subsection{Bước 5: Lọc quan sát}
 
-Đề tài nghiên cứu \emph{một GPU rời đã bán ra thị trường}, nên nhóm loại GPU tích hợp,
-card chưa phát hành và các cấu hình nhiều GPU (ghép nhiều card SLI/CrossFire, card hai
-chip như GTX~690 hay R9~295X2), vì công suất ghi cho các cấu hình này là của cả hệ.
-Cấu hình nhiều GPU được nhận diện bằng các quy tắc trên tên sản phẩm: tên chứa ``SLI'',
-``CrossFire'', ``X2''\ldots{} hoặc thuộc danh sách các card hai chip đã biết.
+Đề tài nghiên cứu \emph{một GPU rời đã bán ra thị trường}, nên bước này lần lượt loại:
+\begin{enumerate}
+  \item GPU tích hợp (\texttt{Dedicated} là No) và các dòng không rõ loại GPU, vì GPU
+    tích hợp nằm chung chip với CPU nên công suất ghi cho chúng không tách khỏi CPU và
+    không so sánh được với GPU rời;
+  \item các cấu hình nhiều GPU, vì công suất ghi cho các cấu hình này là của cả hệ. Chúng
+    được nhận diện bằng các quy tắc trên tên sản phẩm: tên chứa ``SLI'' hoặc
+    ``CrossFire''; card hai chip có ``X2'' ngay sau số hiệu (như R9~295X2, HD~4870~X2) hoặc
+    ``GX2''; cấu hình ghép GPU tích hợp với GPU rời, tên có dạng ``A + B''; và một danh
+    sách các sản phẩm nhiều GPU đã biết (như GTX~690, Quadro Plex). Các tên có ``X2'' chỉ
+    là tên dòng tản nhiệt (như HIS IceQ X2, Inno3D Twin X2) vẫn được giữ. Danh sách các
+    tên khớp quy tắc đã được rà lại để tránh loại nhầm;
+  \item card chưa phát hành (tên có ghi ``[not released]'');
+  \item các dòng trùng nhau hoàn toàn.
+\end{enumerate}
 
-\begin{table}[!htbp]
+\begin{table}[H]
   \centering
-  \caption{Số dòng còn lại sau từng bước lọc}
+  \caption{Số dòng còn lại sau từng điều kiện lọc}
   \label{tab:rows}
   \small
   \begin{tabular}{lr}
     \toprule
-    \textbf{Bước} & \textbf{Số dòng} \\
+    \textbf{Điều kiện lọc} & \textbf{Số dòng} \\
     \midrule
     Dữ liệu gốc & \PreRowsRaw \\
     Chỉ giữ GPU rời & \PreRowsDedicated \\
@@ -191,85 +303,171 @@ Cấu hình nhiều GPU được nhận diện bằng các quy tắc trên tên 
   \end{tabular}
 \end{table}
 
-\textbf{Nhận xét.} Bước đầu loại \PreIntegrated{} GPU tích hợp và \PreUnknownDedicated{}
-dòng không rõ loại GPU. Dữ liệu còn \PreRowsFinal{} GPU rời, gồm \PreDesktop{} card desktop
-và \PreLaptop{} card laptop.
+\textbf{Nhận xét.} Theo Bảng~\ref{tab:rows}, điều kiện thứ nhất loại \PreIntegrated{} GPU tích hợp và
+\PreUnknownDedicated{} dòng không rõ loại GPU; các điều kiện sau loại
+\PreMultiGpuRemoved{} cấu hình nhiều GPU và \PreUnreleasedRemoved{} card chưa phát hành.
+Không có dòng trùng hoàn toàn. Dữ liệu còn \PreRowsFinal{} GPU rời, gồm \PreDesktop{} card
+desktop và \PreLaptop{} card laptop.
+
+Đơn vị quan sát là một mẫu card bán ra thị trường, không phải một chip. Nhiều hãng gia
+công bán card dùng chung một chip và thường ghi cùng một công suất định mức (ví dụ phần lớn
+các bản GTX~1080~Ti ghi 220~W), nên các quan sát không hoàn toàn độc lập. Hạn chế này
+cần được lưu ý khi diễn giải các kiểm định ở các mục sau.
 
 % ---------------------------------------------------------------------
-\subsection{Tạo biến mới}
+\subsection{Bước 6: Tạo biến mới}
 
 Bước này tạo các biến mà nhiều phân tích phải dùng cùng một định nghĩa, rồi giữ lại
-\PreColsFinal{} cột cho bộ dữ liệu cuối (Bảng~\ref{tab:columns}, kèm tỉ lệ khuyết của
-từng cột):
+\PreColsFinal{} cột cho bộ dữ liệu cuối (Bảng~\ref{tab:columns}):
 \begin{itemize}
-  \item \texttt{segment}: Desktop hoặc Laptop.
-  \item \texttt{needs\_aux\_power}: công suất trên 75~W, mức tối đa một khe PCIe cấp được.
-  \item \texttt{memory\_type\_group}: loại bộ nhớ, gộp các loại có dưới 30 card thành
-    ``Other'' để mỗi nhóm đủ lớn khi so sánh.
-  \item \texttt{texture\_rate\_per\_watt}: hiệu quả năng lượng (tốc độ xử lý texture trên
-    mỗi watt).
+  \item \texttt{segment}: Desktop hoặc Laptop, lấy từ \texttt{is\_notebook}.
+  \item \texttt{needs\_aux\_power}: công suất trên 75~W, mức tối đa một khe PCIe cấp được,
+    tức card cần thêm dây nguồn phụ. Cột này chỉ có ý nghĩa với card desktop, vì card
+    laptop không cắm qua khe PCIe (có \PreLaptopAuxPower{} card laptop trên 75~W); khi
+    dùng cột này cần chỉ xét card desktop.
+  \item \texttt{memory\_type\_group}: loại bộ nhớ, gộp các loại có ít hơn 30 card biết
+    công suất (\PreMemoryTypeOtherNames) thành ``Other'', còn \PreMemoryTypeGroups{} nhóm.
+    Ngưỡng 30 giúp mỗi nhóm đủ lớn để so sánh giữa các nhóm. Nhóm ``Other'' gộp các công
+    nghệ rất khác nhau (từ DDR đời cũ tới HBM) nên không được diễn giải riêng.
+  \item \texttt{texture\_rate\_per\_watt}: hiệu quả năng lượng, bằng tốc độ xử lý texture
+    chia cho công suất.
 \end{itemize}
+Các cột chỉ dùng trong lúc xử lý (như \texttt{is\_dedicated}, \texttt{memory\_bus\_bit},
+\texttt{boost\_clock\_mhz}) không được giữ lại.
 
-\begin{table}[!htbp]
+\begin{table}[H]
   \centering
-  \caption{Các cột của bộ dữ liệu sau tiền xử lý và tỉ lệ khuyết}
+  \caption{Các cột của bộ dữ liệu sau tiền xử lý: kiểu dữ liệu và tỉ lệ khuyết}
   \label{tab:columns}
   \small
-  \begin{tabular}{l >{\ttfamily}l r}
+  \begin{tabular}{l >{\ttfamily}l l r}
     \toprule
-    \textbf{Vai trò} & \normalfont\textbf{Cột} & \textbf{Khuyết (\%)} \\
+    \textbf{Vai trò} & \normalfont\textbf{Cột} & \textbf{Kiểu dữ liệu} & \textbf{Khuyết (\%)} \\
     \midrule
-    Định danh & gpu\_id & \PreMissingPctGpuId \\
-              & name & \PreMissingPctName \\
+    Định danh & gpu\_id & số nguyên & \PreMissingPctGpuId \\
+              & name & chuỗi & \PreMissingPctName \\
     \midrule
-    Biến mục tiêu & max\_power\_w & \PreMissingPctMaxPowerW \\
+    Biến mục tiêu & max\_power\_w & số thực & \PreMissingPctMaxPowerW \\
     \midrule
-    Biến tạo từ mục tiêu & needs\_aux\_power & \PreMissingPctNeedsAuxPower \\
-                         & texture\_rate\_per\_watt & \PreMissingPctTextureRatePerWatt \\
+    Biến tạo từ mục tiêu & needs\_aux\_power & đúng/sai & \PreMissingPctNeedsAuxPower \\
+                         & texture\_rate\_per\_watt & số thực & \PreMissingPctTextureRatePerWatt \\
     \midrule
-    Biến giải thích & tmus & \PreMissingPctTmus \\
-                    & core\_speed\_mhz & \PreMissingPctCoreSpeedMhz \\
-                    & memory\_bandwidth\_gb\_s & \PreMissingPctMemoryBandwidthGbS \\
-                    & memory\_mb & \PreMissingPctMemoryMb \\
-                    & process\_nm & \PreMissingPctProcessNm \\
+    Biến giải thích & tmus & số đếm & \PreMissingPctTmus \\
+                    & core\_speed\_mhz & số thực & \PreMissingPctCoreSpeedMhz \\
+                    & memory\_bandwidth\_gb\_s & số thực & \PreMissingPctMemoryBandwidthGbS \\
+                    & memory\_mb & số thực & \PreMissingPctMemoryMb \\
+                    & process\_nm & số thực & \PreMissingPctProcessNm \\
     \midrule
-    Biến phân nhóm & manufacturer & \PreMissingPctManufacturer \\
-                   & segment & \PreMissingPctSegment \\
-                   & memory\_type & \PreMissingPctMemoryType \\
-                   & memory\_type\_group & \PreMissingPctMemoryTypeGroup \\
+    Biến phân nhóm & manufacturer & phân loại & \PreMissingPctManufacturer \\
+                   & segment & phân loại & \PreMissingPctSegment \\
+                   & memory\_type & phân loại & \PreMissingPctMemoryType \\
+                   & memory\_type\_group & phân loại & \PreMissingPctMemoryTypeGroup \\
     \midrule
-    Thời gian & release\_year & \PreMissingPctReleaseYear \\
-    Kiến trúc chip & architecture & \PreMissingPctArchitecture \\
+    Thời gian & release\_year & số nguyên & \PreMissingPctReleaseYear \\
+    \midrule
+    Kiến trúc chip & architecture & chuỗi & \PreMissingPctArchitecture \\
     \bottomrule
   \end{tabular}
+\end{table}
+
+Kết quả: bộ dữ liệu cuối gồm \PreRowsFinal{} GPU rời và \PreColsFinal{} cột.
+Bảng~\ref{tab:sample} là một vài dòng của bộ dữ liệu: mỗi biến số đã ở dạng số với một
+đơn vị, giá trị khuyết ghi là \texttt{NA}, và dòng GTX~1080~Ti Zotac Founders Edition đã
+có số TMUs đúng.
+
+\begin{table}[H]
+  \centering
+  \caption{Một vài dòng của bộ dữ liệu sau tiền xử lý}
+  \label{tab:sample}
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}X r r r r r r r}
+    \toprule
+    \textbf{Tên} & \textbf{Năm} & \textbf{Công suất} & \textbf{TMUs} & \textbf{Xung nhịp}
+      & \textbf{Băng thông} & \textbf{Bộ nhớ} & \textbf{Tiến trình} \\
+    & & (W) & & (MHz) & (GB/s) & (MB) & (nm) \\
+    \midrule
+    \csname @@input\endcsname generated/preprocessing_sample_rows.tex
+    \bottomrule
+  \end{tabularx}
 \end{table}
 
 % ---------------------------------------------------------------------
 \subsection{Xử lý dữ liệu khuyết}
 
-Biến mục tiêu \texttt{max\_power\_w} thiếu ở \PrePowerMissing{} dòng
-(\PrePowerMissingPct\%). Nhóm không điền giá trị thiếu, vì điền bằng trung bình
-hay trung vị sẽ làm sai lệch phân phối; mỗi phân tích tự chọn các dòng có đủ biến cần
-dùng.
+\textbf{Cách xử lý.} Nhóm không điền giá trị khuyết. Bộ dữ liệu cuối giữ nguyên các ô
+\texttt{NA} (tỉ lệ khuyết của từng cột ở Bảng~\ref{tab:columns}). Nhóm cũng không loại bỏ
+các dòng khuyết ngay ở bước tiền xử lý, vì tỉ lệ khuyết quá lớn: \PreRowsIncomplete{} trong
+\PreRowsFinal{} dòng (\PreRowsIncompletePct\%) có ít nhất một ô khuyết, nên nếu loại bỏ
+hết thì chỉ còn \PreRowsComplete{} dòng, và phân tích chỉ cần công suất sẽ mất
+\PrePowerRowsLostByDropAll{} card dù có đủ số liệu công suất. Thay vào đó, khi làm một phân
+tích, nhóm chỉ bỏ những dòng bị khuyết ở các biến mà phân tích đó dùng. Ví dụ:
+\begin{itemize}
+  \item tính khoảng tin cậy cho công suất trung bình chỉ cần biến công suất, nên dùng được
+    \PreRowsWithPower{} trong \PreRowsFinal{} card;
+  \item phân tích cần công suất và cả năm biến giải thích dùng được
+    \PreRowsWithPowerAndPredictors{} card.
+\end{itemize}
 
-Các biến giải thích cũng có giá trị khuyết, nhiều nhất là \texttt{core\_speed\_mhz}
-(\PreMissingPctCoreSpeedMhz\%) và \texttt{tmus} (\PreMissingPctTmus\%)
-(Bảng~\ref{tab:columns}), nên một phân tích dùng càng nhiều biến thì càng còn ít dòng.
+\textbf{Vì sao không điền.} Có ba cách xử lý dữ liệu khuyết: (1) bỏ các dòng khuyết;
+(2) điền bằng trung bình hoặc trung vị của các giá trị không khuyết; (3) điền bằng một giá
+trị cố định. Cách (3) không dùng được, vì một giá trị như 0~W không có ý nghĩa với GPU. Để
+so sánh cách (1) và cách (2), nhóm tính các đặc trưng mẫu của công suất theo hai cách
+(Bảng~\ref{tab:imputation}).
 
-\textbf{Nhận xét.} Card thiếu số liệu công suất là card đời cũ hơn (trung vị năm phát
-hành \PreMissingMedianYear{} so với \PreObservedMedianYear{}, kiểm định Mann--Whitney
-$p$ \PreMissingYearP) và có tỉ lệ AMD cao hơn (\PreMissingAmdPct\% so với
-\PreObservedAmdPct\%, $p$ \PreMissingMakerP). Vì vậy các thống kê trên toàn mẫu đại diện
-nhiều hơn cho card đời mới.
+\begin{table}[H]
+  \centering
+  \caption{Đặc trưng mẫu của công suất khi bỏ dòng khuyết và khi điền trung vị}
+  \label{tab:imputation}
+  \small
+  \begin{tabular}{l r r}
+    \toprule
+    \textbf{Đặc trưng} & \textbf{Bỏ dòng khuyết} & \textbf{Điền trung vị} \\
+    \midrule
+    Cỡ mẫu $n$ & \PreRowsWithPower & \PreRowsFinal \\
+    Trung bình mẫu $\bar{x}$ (W) & \PrePowerMeanDropped & \PrePowerMeanImputed \\
+    Độ lệch chuẩn mẫu $s$ (W) & \PrePowerSdDropped & \PrePowerSdImputed \\
+    Độ chính xác $\varepsilon$ của khoảng tin cậy 95\% (W)
+      & \PrePowerCiDropped & \PrePowerCiImputed \\
+    Tỉ lệ card có công suất bằng trung vị (\%)
+      & \PrePowerAtMedianDropped & \PrePowerAtMedianImputed \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{Nhận xét.} Trung bình mẫu gần như không đổi, nhưng độ lệch chuẩn giảm từ
+\PrePowerSdDropped{} xuống \PrePowerSdImputed~W và độ chính xác $\varepsilon$ giảm từ
+\PrePowerCiDropped{} xuống \PrePowerCiImputed~W. Lý do là \PrePowerMissing{} giá trị điền
+vào đều bằng trung vị, nên \PrePowerAtMedianImputed\% card có cùng một công suất và dữ liệu
+trông ít phân tán hơn thực tế. Khi đó khoảng tin cậy hẹp hơn mức đúng, và kiểm định dễ bác
+bỏ $H_0$ khi $H_0$ đúng (sai lầm loại I). Ngoài ra, công suất là biến mục tiêu của đề tài;
+điền giá trị vào là tự tạo ra chính số liệu cần phân tích. Vì vậy nhóm chọn cách (1).
+
+\textbf{Lưu ý.} Cách bỏ dòng khuyết chỉ cho kết quả đúng nếu card bị khuyết giống các card
+còn lại. Nhóm kiểm tra điều này bằng hai kiểm định hai mẫu, mức ý nghĩa 5\%:
+\begin{itemize}
+  \item năm phát hành trung bình của card khuyết công suất là \PreMissingMeanYear, của
+    card có công suất là \PreObservedMeanYear; kiểm định so sánh hai trung bình cho
+    $z = \PreMissingYearZ$, $p$ \PreMissingYearP;
+  \item trong số card Nvidia và AMD, tỉ lệ card AMD ở nhóm khuyết công suất là
+    \PreMissingAmdPct\%, ở nhóm có công suất là \PreObservedAmdPct\%; kiểm định so sánh hai
+    tỉ lệ cho $z = \PreMissingMakerZ$, $p$ \PreMissingMakerP. ATI (\PreAtiCards{} card,
+    \PreAtiMissing{} card khuyết công suất) và Intel (\PreIntelCards{} card) không đưa vào
+    phép so sánh này.
+\end{itemize}
+Cả hai kiểm định đều bác bỏ $H_0$: card khuyết công suất là card đời cũ hơn và có nhiều
+card AMD hơn. Đây là thiên kiến không phản hồi, tức những phần tử thiếu số liệu có đặc điểm
+khác những phần tử có số liệu. Vì vậy các kết quả về công suất đại diện nhiều hơn cho card
+đời mới.
 
 % ---------------------------------------------------------------------
 \subsection{Các hàm chính và cấu trúc dữ liệu}
 
-Quy trình được tóm tắt ở Hình~\ref{fig:preprocess}; Bảng~\ref{tab:functions} giải thích
-các hàm chính. Dữ liệu được lưu dưới dạng bảng \texttt{pandas.DataFrame}, mỗi dòng là một GPU,
-mỗi cột là một biến.
+Dữ liệu được lưu dưới dạng bảng \texttt{pandas.DataFrame}: mỗi dòng là một mẫu card, mỗi
+cột là một biến với kiểu dữ liệu như ở Bảng~\ref{tab:columns}. Bảng~\ref{tab:functions}
+giải thích các hàm chính, theo thứ tự trong sơ đồ khối ở Hình~\ref{fig:preprocess}.
 
-\begin{table}[!htbp]
+\begin{table}[H]
   \centering
   \caption{Các hàm chính trong quy trình tiền xử lý}
   \label{tab:functions}
@@ -280,32 +478,11 @@ mỗi cột là một biến.
     \midrule
     read\_raw & Đọc tệp gốc, mọi cột dưới dạng chuỗi \\
     select\_columns & Giữ các biến cần cho đề tài \\
-    clean\_text & Xóa khoảng trắng, đánh dấu giá trị thiếu \\
+    clean\_text & Xóa khoảng trắng, đánh dấu giá trị khuyết, sửa lỗi mã hóa \\
     parse\_columns & Tách đơn vị, đổi kiểu, sửa lỗi ``(x$N$)''; báo lỗi nếu gặp định dạng lạ \\
-    check\_consistency & Kiểm tra giá trị bằng đẳng thức giữa các biến \\
-    filter\_rows & Lọc quan sát, đếm số dòng còn lại sau mỗi bước \\
+    check\_consistency & Đếm các dòng không thỏa đẳng thức giữa các biến \\
+    filter\_rows & Lọc quan sát, đếm số dòng còn lại sau mỗi điều kiện \\
     derive\_variables & Tạo biến mới, giữ các cột cần dùng \\
     \bottomrule
   \end{tabularx}
-\end{table}
-
-\textbf{Kết quả.} Bộ dữ liệu sau tiền xử lý gồm \PreRowsFinal{} GPU rời và
-\PreColsFinal{} cột. Trong các dòng mẫu ở Bảng~\ref{tab:sample}, mỗi biến số đã ở dạng
-số với một đơn vị, giá trị thiếu ghi là \texttt{NA}, và GTX 1080 Ti có số TMUs đúng.
-
-\begin{table}[!htbp]
-  \centering
-  \caption{Một vài dòng của bộ dữ liệu sau tiền xử lý}
-  \label{tab:sample}
-  \footnotesize
-  \setlength{\tabcolsep}{4pt}
-  \begin{tabular}{l r r r r r r r}
-    \toprule
-    \textbf{Tên} & \textbf{Năm} & \textbf{Công suất} & \textbf{TMUs} & \textbf{Xung nhịp}
-      & \textbf{Băng thông} & \textbf{Bộ nhớ} & \textbf{Tiến trình} \\
-    & & (W) & & (MHz) & (GB/s) & (MB) & (nm) \\
-    \midrule
-    \csname @@input\endcsname generated/preprocessing_sample_rows.tex
-    \bottomrule
-  \end{tabular}
 \end{table}

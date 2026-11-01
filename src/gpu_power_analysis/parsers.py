@@ -52,12 +52,14 @@ def parse_bandwidth(values: pd.Series) -> pd.Series:
 
 
 def parse_multiplier(values: pd.Series) -> pd.Series:
-    """Return N from an ``"a (xN)"`` suffix, or 1 when there is no suffix.
+    """Return N from an ``"a (xN)"`` value, or 1 for a plain count ``"a"``.
 
     Missing values give 1 as well, so the result can always be multiplied.
+    Raises on any other format.
     """
-    factor = values.str.extract(r"\(x(\d+)\)$", expand=False)
-    return pd.to_numeric(factor).fillna(1).astype("Float64")
+    parts = values.str.extract(r"^(?P<count>\d+)(?: \(x(?P<factor>[1-9]\d*)\))?$")
+    _check_all_parsed(values, parts["count"], "a count or 'a (xN)'")
+    return pd.to_numeric(parts["factor"]).fillna(1).astype("Float64")
 
 
 def parse_yes_no(values: pd.Series) -> pd.Series:

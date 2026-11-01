@@ -1,13 +1,15 @@
 """Step-by-step preprocessing of the raw GPU file into the analysis dataset.
 
-Steps:
+Steps (the same six steps as the report):
     1. read_raw          read every column as text, untouched
     2. select_columns    keep only the raw columns the project needs
     3. clean_text        trim whitespace, mark missing values, fix encoding
     4. parse_columns     convert units and types; repair the "(xN)" error
-    5. filter_rows       keep released, single, dedicated GPUs
+                         (check_consistency verifies the repair)
+    5. filter_rows       keep dedicated, single-GPU, released, unique rows
     6. derive_variables  add shared variables; keep the final columns
-    7. describe_columns  build the data dictionary
+
+describe_columns then builds the data dictionary written with the outputs.
 
 Missing values are kept: every analysis selects its own complete cases, and
 the response ``max_power_w`` is never imputed. Outliers, log transforms and
@@ -28,9 +30,9 @@ UNKNOWN_DATE = "Unknown Release Date"
 ENCODING_FIXES = {"Â²": "²"}
 
 # Raw columns the project needs. The last six are only used while processing:
-# Dedicated to filter, ROPs for the "(xN)" factor, Texture_Rate for the
-# efficiency variable, and Boost_Clock, Memory_Bus, Memory_Speed to check the
-# repaired values against the texture-rate and bandwidth identities.
+# Dedicated to filter, ROPs for the "(xN)" factor, Texture_Rate to check the
+# texture-rate identity and for the efficiency variable, Memory_Bus to repair
+# and check the bandwidth identity, and Boost_Clock, Memory_Speed to check.
 USED_COLUMNS = [
     "Name",
     "Manufacturer",
@@ -215,8 +217,8 @@ def parse_columns(selected: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def check_consistency(parsed: pd.DataFrame, tolerance: float = 0.1) -> dict[str, int]:
-    """Count rows whose related columns disagree by more than ``tolerance``.
+def consistency_flags(parsed: pd.DataFrame, tolerance: float = 0.1) -> pd.DataFrame:
+    """Flag rows whose related columns disagree by more than ``tolerance``.
 
     Two identities hold for real GPUs:
       * texture rate = TMUs x clock (boost clock when listed, else base clock);
@@ -224,7 +226,8 @@ def check_consistency(parsed: pd.DataFrame, tolerance: float = 0.1) -> dict[str,
         factor k is fixed for each memory type (taken as the type's median).
     A row that breaks one of them carries a data error in one of its columns.
     Texture rates are rounded to whole GTexel/s in the raw file, so a gap of
-    up to 0.5 is accepted whatever its relative size.
+    up to 0.5 is accepted whatever its relative size. Rows missing a value
+    needed by an identity are not flagged for it.
     """
     clock = parsed["boost_clock_mhz"].fillna(parsed["core_speed_mhz"])
     expected_texture = parsed["tmus"] * clock / 1000
@@ -237,12 +240,22 @@ def check_consistency(parsed: pd.DataFrame, tolerance: float = 0.1) -> dict[str,
     typical = data_rate.groupby(parsed["memory_type"], observed=True).transform(
         "median"
     )
-    return {
-        "texture_rate_mismatch": int(
-            ((texture_gap > 0.5) & (texture_gap > tolerance * expected_texture)).sum()
-        ),
-        "bandwidth_mismatch": int(((data_rate / typical - 1).abs() > tolerance).sum()),
-    }
+    return pd.DataFrame(
+        {
+            "texture_rate_mismatch": (
+                (texture_gap > 0.5) & (texture_gap > tolerance * expected_texture)
+            ).fillna(False),
+            "bandwidth_mismatch": ((data_rate / typical - 1).abs() > tolerance).fillna(
+                False
+            ),
+        }
+    )
+
+
+def check_consistency(parsed: pd.DataFrame, tolerance: float = 0.1) -> dict[str, int]:
+    """Count rows breaking each identity of :func:`consistency_flags`."""
+    flags = consistency_flags(parsed, tolerance)
+    return {name: int(flags[name].sum()) for name in flags.columns}
 
 
 def match_multi_gpu_rules(names: pd.Series) -> pd.Series:
@@ -254,7 +267,7 @@ def match_multi_gpu_rules(names: pd.Series) -> pd.Series:
 
 
 def filter_rows(parsed: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Step 5: keep released, single, dedicated GPUs.
+    """Step 5: keep dedicated, single-GPU, released, non-duplicate rows.
 
     Returns:
         The kept rows, and a table with the number of rows after each filter.
