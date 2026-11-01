@@ -395,19 +395,23 @@ có số TMUs đúng.
 % ---------------------------------------------------------------------
 \subsection{Xử lý dữ liệu khuyết}
 
-Sau tiền xử lý, nhiều cột vẫn có giá trị khuyết (Bảng~\ref{tab:columns}): biến mục tiêu
-\texttt{max\_power\_w} khuyết ở \PrePowerMissing{} dòng (\PrePowerMissingPct\%), các biến
-giải thích khuyết nhiều nhất ở \texttt{core\_speed\_mhz} (\PreMissingPctCoreSpeedMhz\%) và
-\texttt{tmus} (\PreMissingPctTmus\%). Có ba cách xử lý thường dùng:
+\textbf{Kết quả.} Nhóm \emph{không điền} giá trị khuyết. Bộ dữ liệu cuối vẫn giữ các ô
+\texttt{NA} (tỉ lệ khuyết của từng cột ở Bảng~\ref{tab:columns}); khi phân tích, mỗi phân
+tích chỉ dùng những dòng có đủ các biến mà nó cần. Ví dụ:
 \begin{itemize}
-  \item loại bỏ các dòng có giá trị khuyết;
-  \item thay giá trị khuyết bằng trung bình hoặc trung vị của các giá trị không khuyết;
-  \item thay bằng một giá trị cố định khác.
+  \item phân tích chỉ cần công suất dùng được \PreRowsWithPower{} trong \PreRowsFinal{}
+    card (bỏ \PrePowerMissing{} card khuyết công suất);
+  \item phân tích cần công suất và cả năm biến giải thích dùng được
+    \PreRowsWithPowerAndPredictors{} card.
 \end{itemize}
+Như vậy phân tích dùng càng nhiều biến thì càng còn ít dòng, nhưng không dòng nào bị bỏ
+oan vì khuyết một biến mà phân tích không dùng.
 
-Để chọn cách xử lý, nhóm so sánh cách thứ nhất và cách thứ hai trên chính dữ liệu
-(Bảng~\ref{tab:imputation}). Cách thứ ba không phù hợp, vì một giá trị cố định như
-0~W hay 0~MHz không có ý nghĩa với GPU.
+\textbf{Vì sao không điền.} Có ba cách xử lý dữ liệu khuyết thường dùng: (1) bỏ các dòng
+khuyết; (2) điền bằng trung bình hoặc trung vị của các giá trị không khuyết; (3) điền bằng
+một giá trị cố định khác. Cách (3) không phù hợp, vì một giá trị như 0~W hay 0~MHz không có
+ý nghĩa với GPU. Bảng~\ref{tab:imputation} so sánh cách (1) và cách (2) trên chính dữ liệu
+của nhóm.
 
 \begin{table}[H]
   \centering
@@ -429,36 +433,27 @@ giải thích khuyết nhiều nhất ở \texttt{core\_speed\_mhz} (\PreMissing
   \end{tabular}
 \end{table}
 
-\textbf{Nhận xét.} Điền trung vị làm độ lệch chuẩn $s$ nhỏ đi và khoảng tin cậy hẹp lại,
-dù các giá trị điền vào không phải số đo thật; khoảng tin cậy vì thế trông chính xác hơn
-thực tế, và các kiểm định dễ bác bỏ $H_0$ sai hơn (tăng sai lầm loại I). Cách này cũng tạo
-ra \PrePowerAtMedianImputed\% card có cùng một công suất và kéo hệ số tương quan về 0, làm
-hệ số hồi quy của xung nhịp bị đánh giá thấp. Vì vậy nhóm chọn cách thứ nhất, theo từng
-loại cột:
+Điền trung vị gây ra ba vấn đề:
 \begin{itemize}
-  \item \texttt{max\_power\_w} và các cột tạo từ nó: không điền, vì đây là biến mục tiêu;
-    điền vào là tự tạo ra kết quả.
-  \item Các biến giải thích: không điền, vì điền làm lệch quan hệ giữa các biến như
-    Bảng~\ref{tab:imputation} cho thấy.
-  \item Các cột khuyết khoảng 1\% (\texttt{memory\_bandwidth\_gb\_s}, \texttt{memory\_mb},
-    \texttt{release\_year}\ldots): không điền, vì số dòng khuyết quá ít để ảnh hưởng tới
-    kết quả.
+  \item \PrePowerAtMedianImputed\% card có cùng một công suất, trong khi các giá trị này
+    không phải số đo thật;
+  \item độ lệch chuẩn $s$ và độ chính xác $\varepsilon$ nhỏ đi, nên khoảng tin cậy trông
+    chính xác hơn thực tế và kiểm định dễ bác bỏ $H_0$ sai hơn (tăng sai lầm loại I);
+  \item hệ số tương quan bị kéo về 0, nên hồi quy sẽ đánh giá thấp ảnh hưởng của xung
+    nhịp tới công suất.
 \end{itemize}
-Bộ dữ liệu vẫn giữ các ô \texttt{NA}; mỗi phân tích chỉ bỏ những dòng khuyết \emph{các biến
-mà phân tích đó dùng}. Cách này giữ được nhiều dòng hơn so với xóa mọi dòng có ô khuyết
-ngay ở bước tiền xử lý, nhưng cũng có nghĩa là phân tích dùng càng nhiều biến thì càng còn
-ít dòng.
+Riêng biến mục tiêu \texttt{max\_power\_w}, điền giá trị vào còn có nghĩa là tự tạo ra
+chính kết quả cần phân tích.
 
-Việc bỏ dòng khuyết chỉ không gây chệch nếu các card khuyết giống các card còn lại. Điều này
-không hoàn toàn đúng: card khuyết số liệu công suất nhìn chung là card đời cũ hơn (trung vị
-năm phát hành \PreMissingMedianYear{} so với \PreObservedMedianYear{}, kiểm định
-Mann--Whitney, $p$ \PreMissingYearP). Phép so sánh theo hãng chỉ xét Nvidia và AMD: ATI
-(\PreAtiCards{} card, \PreAtiMissing{} card khuyết công suất) và Intel chỉ có
-\PreIntelCards{} card. Trong số card Nvidia và AMD, nhóm khuyết công suất có tỉ lệ AMD cao
-hơn (\PreMissingAmdPct\% so với \PreObservedAmdPct\%, kiểm định khi bình phương,
-$p$ \PreMissingMakerP). Đây là dạng thiên kiến không phản hồi: phần tử thiếu số liệu có đặc
-điểm khác phần tử có số liệu. Vì vậy các kết quả về công suất (chỉ tính trên các card có số
-liệu) đại diện nhiều hơn cho card đời mới; các mục sau cần lưu ý điều này khi diễn giải.
+\textbf{Lưu ý khi diễn giải.} Bỏ dòng khuyết chỉ không gây chệch nếu card khuyết giống các
+card còn lại. Điều này không hoàn toàn đúng: card khuyết công suất nhìn chung là card đời
+cũ hơn (trung vị năm phát hành \PreMissingMedianYear{} so với \PreObservedMedianYear{},
+kiểm định Mann--Whitney, $p$ \PreMissingYearP) và, trong số card Nvidia và AMD, có tỉ lệ
+AMD cao hơn (\PreMissingAmdPct\% so với \PreObservedAmdPct\%, kiểm định khi bình phương,
+$p$ \PreMissingMakerP). ATI (\PreAtiCards{} card, \PreAtiMissing{} card khuyết công suất)
+và Intel (\PreIntelCards{} card) không đưa vào phép so sánh theo hãng. Đây là dạng thiên
+kiến không phản hồi: phần tử thiếu số liệu khác phần tử có số liệu. Vì vậy các kết quả về
+công suất đại diện nhiều hơn cho card đời mới.
 
 % ---------------------------------------------------------------------
 \subsection{Các hàm chính và cấu trúc dữ liệu}

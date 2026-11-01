@@ -113,7 +113,18 @@ def imputation_effect(analysis: pd.DataFrame) -> dict[str, str]:
     clock_filled = clock.fillna(clock.median())
     both = power.notna() & clock.notna()
     log_power = np.log(power.clip(lower=1))
+    predictors = [
+        "tmus",
+        "core_speed_mhz",
+        "memory_bandwidth_gb_s",
+        "memory_mb",
+        "process_nm",
+    ]
     return {
+        "RowsWithPower": int(power.notna().sum()),
+        "RowsWithPowerAndPredictors": int(
+            analysis[["max_power_w", *predictors]].notna().all(axis=1).sum()
+        ),
         "PowerSdDropped": decimal(power.std()),
         "PowerSdImputed": decimal(power_filled.std()),
         "PowerCiDropped": decimal(ci_half_width(power.dropna())),
