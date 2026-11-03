@@ -61,8 +61,8 @@ gpu-power-analysis/
 | 2 | `select_columns` | Chỉ giữ 18 cột cần cho đề tài (`USED_COLUMNS`) | 18 cột |
 | 3 | `clean_text` | Xóa khoảng trắng; đổi ô trống, `"-"`, `"Unknown Release Date"` thành giá trị thiếu; sửa lỗi mã hóa tên | `"\n01-Mar-2009 "` → `"01-Mar-2009"` |
 | 4 | `parse_columns` | Tách đơn vị, đổi kiểu, sửa lỗi `(xN)`; **gặp định dạng lạ thì dừng và báo lỗi**; `check_consistency` kiểm tra kết quả | `"738 MHz"` → 738; `"800MB/sec"` → 0,8; TMUs `56` → 224 khi ROPs ghi `"24 (x4)"` |
-| 5 | `filter_rows` | Giữ GPU rời → bỏ cấu hình nhiều GPU → bỏ card chưa phát hành → bỏ dòng trùng | 3406 → 3018 → 2775 → 2762 → 2762 dòng |
-| 6 | `derive_variables` | Thêm `segment`, `needs_aux_power` (trên 75 W, chỉ có ý nghĩa với card desktop), `texture_rate_per_watt`, `memory_type_group` (gộp các loại có dưới 30 card **có số liệu công suất** thành "Other"); giữ 16 cột cuối | 2318 desktop, 444 laptop |
+| 5 | `filter_rows` | Giữ GPU rời → bỏ cấu hình nhiều GPU → bỏ card chưa phát hành → bỏ dòng trùng → **bỏ dòng có ô khuyết** | 3406 → 3018 → 2775 → 2762 → 2762 → 1838 dòng |
+| 6 | `derive_variables` | Thêm `segment`, `needs_aux_power` (trên 75 W, chỉ có ý nghĩa với card desktop), `texture_rate_per_watt`, `memory_type_group` (gộp các loại có dưới 30 card thành "Other"); giữ 16 cột cuối | 1601 desktop, 237 laptop; không còn ô khuyết |
 
 Sau 6 bước, `describe_columns` tạo từ điển dữ liệu (cột `role`: vai trò, `used_in`: phân
 tích sử dụng) rồi script ghi các file đầu ra.
@@ -158,8 +158,11 @@ bằng thông số trong chính dữ liệu: card hai chip có TMUs và độ r�
 
 ### Nguyên tắc và phạm vi
 
-- **Không điền giá trị thiếu** cho biến mục tiêu `max_power_w` (thiếu ở 481 dòng). Mỗi
-  bài toán tự chọn các dòng đủ biến.
+- **Không điền giá trị thiếu; loại bỏ các dòng thiếu ngay ở bước 5** (theo góp ý của
+  thầy), để mọi phân tích dùng chung một bộ dữ liệu đầy đủ: 924/2762 dòng bị loại, còn
+  1838 dòng. Hệ quả: dữ liệu chỉ còn card phát hành 2006–2017 và không còn card Intel;
+  card thiếu công suất thường là card đời cũ và card AMD, nên kết quả nghiêng về card đời
+  mới (mục 3.7 của báo cáo).
 - **14 dòng không rõ GPU rời hay tích hợp bị loại** theo quy tắc `Dedicated = Yes`,
   không điền tay. Không dòng nào trong số đó đủ biến cho mô hình hồi quy.
 - **Không sửa tay giá trị** theo nguồn bên ngoài; chỉ sửa các lỗi phát hiện được một cách
@@ -171,17 +174,17 @@ bằng thông số trong chính dữ liệu: card hai chip có TMUs và độ r�
 ## Dữ liệu này dùng được cho những phân tích nào
 
 Phần này chỉ là **gợi ý**: nêu cột cần dùng, cách lọc và số dòng sẵn có. Việc chọn phương
-pháp, xử lý ngoại lai và lấy log do từng phân tích tự quyết định. Số dòng dưới đây chỉ
-tính các card **có số liệu công suất** (`max_power_w` không thiếu).
+pháp, xử lý ngoại lai và lấy log do từng phân tích tự quyết định. Bộ dữ liệu không còn ô
+thiếu, nên không cần lọc thêm theo giá trị thiếu.
 
 | Phân tích | Cột chính | Cách lọc | Dữ liệu sẵn có |
 |---|---|---|---|
-| Thống kê mô tả | `max_power_w` và các cột còn lại | Có công suất | 2281 GPU, năm 2000–2017; 2094 card có hiệu quả năng lượng |
-| Khoảng tin cậy cho tỉ lệ card cần nguồn phụ | `needs_aux_power` | Desktop, có công suất | 1913 GPU, trong đó 1310 card trên 75 W |
-| So sánh hai nhóm | `max_power_w` theo `segment` hoặc `manufacturer` | Có công suất; Nvidia và AMD khi so sánh hãng | Desktop 1913 / laptop 368; Nvidia 1341 / AMD 856 |
-| ANOVA | `max_power_w` theo `memory_type_group`; hoặc theo `manufacturer` × `segment` | Có công suất; Nvidia và AMD cho ANOVA hai yếu tố | 6 nhóm bộ nhớ, nhóm nhỏ nhất 33 card; bảng hãng × phân khúc, ô nhỏ nhất 137 card |
-| Hồi quy | `max_power_w` theo `tmus`, `core_speed_mhz`, `memory_bandwidth_gb_s`, `memory_mb`, `process_nm`, `manufacturer`; cụm theo `architecture` | Desktop, Nvidia và AMD, đủ 6 biến | 1557 card thuộc 155 kiến trúc chip; mọi biến đều dương nên lấy log được |
-| Kiểm chứng ngoài mẫu theo thời gian | Như hồi quy, chia theo `release_year` | Như hồi quy | 1083 card đến 2014, 450 card 2015–2017 (24 card không rõ năm) |
+| Thống kê mô tả | `max_power_w` và các cột còn lại | Không | 1838 GPU, năm 2006–2017 |
+| Khoảng tin cậy cho tỉ lệ card cần nguồn phụ | `needs_aux_power` | Desktop | 1601 GPU, trong đó 1150 card trên 75 W |
+| So sánh hai nhóm | `max_power_w` theo `segment` hoặc `manufacturer` | Nvidia và AMD khi so sánh hãng | Desktop 1601 / laptop 237; Nvidia 1133 / AMD 637 |
+| ANOVA | `max_power_w` theo `memory_type_group`; hoặc theo `manufacturer` × `segment` | Nvidia và AMD cho ANOVA hai yếu tố | 5 nhóm bộ nhớ, nhóm nhỏ nhất 25 card (Other); bảng hãng × phân khúc, ô nhỏ nhất 92 card |
+| Hồi quy | `max_power_w` theo `tmus`, `core_speed_mhz`, `memory_bandwidth_gb_s`, `memory_mb`, `process_nm`, `manufacturer`; cụm theo `architecture` | Desktop, Nvidia và AMD | 1533 card thuộc 155 kiến trúc chip; mọi biến đều dương nên lấy log được |
+| Kiểm chứng ngoài mẫu theo thời gian | Như hồi quy, chia theo `release_year` | Như hồi quy | 1083 card đến 2014, 450 card 2015–2017 |
 
 Ví dụ lấy mẫu cho hồi quy:
 
@@ -189,16 +192,9 @@ Ví dụ lấy mẫu cho hồi quy:
 from gpu_power_analysis.preprocess import load_analysis
 
 gpus = load_analysis()
-predictors = [
-    "tmus",
-    "core_speed_mhz",
-    "memory_bandwidth_gb_s",
-    "memory_mb",
-    "process_nm",
-]
 sample = gpus[
     gpus["segment"].eq("Desktop") & gpus["manufacturer"].isin(["Nvidia", "AMD"])
-].dropna(subset=["max_power_w", *predictors])  # 1557 rows
+]  # 1533 rows, no missing value
 ```
 
 ## Quy chuẩn code

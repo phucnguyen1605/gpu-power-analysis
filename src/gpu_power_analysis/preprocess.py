@@ -7,13 +7,15 @@ Steps (the same six steps as the report):
     4. parse_columns     convert units and types; repair the "(xN)" error
                          (check_consistency verifies the repair)
     5. filter_rows       keep dedicated, single-GPU, released, unique rows
+                         with no missing value
     6. derive_variables  add shared variables; keep the final columns
 
 describe_columns then builds the data dictionary written with the outputs.
 
-Missing values are kept: every analysis selects its own complete cases, and
-the response ``max_power_w`` is never imputed. Outliers, log transforms and
-model samples are not handled here; each analysis does them in its own context.
+Rows with a missing value are dropped at the end of step 5, so every analysis
+uses the same complete dataset; nothing is imputed. Outliers, log transforms
+and model samples are not handled here; each analysis does them in its own
+context.
 """
 
 from pathlib import Path
@@ -123,7 +125,7 @@ COLUMNS = {
     "memory_type_group": (
         GROUPING,
         _uses(DESCRIPTIVE, ANOVA),
-        f"Memory technology; types with under {MIN_GROUP_SIZE} cards of known power "
+        f"Memory technology; types with under {MIN_GROUP_SIZE} cards "
         f"pooled into '{OTHER}'",
     ),
     "architecture": (
@@ -266,8 +268,33 @@ def match_multi_gpu_rules(names: pd.Series) -> pd.Series:
     return matches.apply(lambda row: ",".join(row.index[row]), axis=1)
 
 
-def filter_rows(parsed: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Step 5: keep dedicated, single-GPU, released, non-duplicate rows.
+# Parsed columns every final column is built from; step 5 drops rows missing any.
+COMPLETE_COLUMNS = [
+    "name",
+    "manufacturer",
+    "architecture",
+    "release_year",
+    "is_notebook",
+    "max_power_w",
+    "tmus",
+    "core_speed_mhz",
+    "memory_bandwidth_gb_s",
+    "memory_mb",
+    "memory_type",
+    "process_nm",
+    "texture_rate_gtexel_s",
+]
+
+
+def filter_rows(
+    parsed: pd.DataFrame, drop_missing: bool = True
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Step 5: keep dedicated, single-GPU, released, non-duplicate complete rows.
+
+    Args:
+        parsed: Output of :func:`parse_columns`.
+        drop_missing: Drop rows missing any value the final dataset needs.
+            Set it to False to study the missing values themselves.
 
     Returns:
         The kept rows, and a table with the number of rows after each filter.
@@ -281,6 +308,8 @@ def filter_rows(parsed: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         ("released", ~names.str.contains(r"(?i)\[not released\]")),
         ("not an exact duplicate", ~parsed.duplicated(subset=value_columns)),
     ]
+    if drop_missing:
+        steps.append(("no missing value", parsed[COMPLETE_COLUMNS].notna().all(axis=1)))
     keep = pd.Series(True, index=parsed.index)
     counts = []
     for step, condition in steps:
@@ -316,6 +345,7 @@ def derive_variables(rows: pd.DataFrame) -> pd.DataFrame:
         .astype("category"),
         needs_aux_power=rows["max_power_w"] > PCIE_SLOT_POWER_W,
         texture_rate_per_watt=rows["texture_rate_gtexel_s"] / rows["max_power_w"],
+        # Counted on cards with known power; after step 5 that is every row.
         memory_type_group=pool_rare(
             rows["memory_type"],
             MIN_GROUP_SIZE,

@@ -81,6 +81,18 @@ def test_kept_rows_satisfy_every_filter(stages):
     assert kept["is_dedicated"].all()
     assert pre.match_multi_gpu_rules(kept["name"]).eq("").all()
     assert not kept["name"].str.contains("not released").any()
+    assert kept[pre.COMPLETE_COLUMNS].notna().all().all()
+
+
+def test_final_dataset_has_no_missing_value(stages):
+    assert not stages["analysis"].isna().any().any()
+
+
+def test_drop_missing_can_be_skipped(stages):
+    scoped, counts = pre.filter_rows(stages["parsed"], drop_missing=False)
+    assert counts["step"].iloc[-1] == "not an exact duplicate"
+    assert scoped["max_power_w"].isna().any()
+    assert len(scoped) > len(stages["analysis"])
 
 
 def test_values_are_carried_over_unchanged(stages):

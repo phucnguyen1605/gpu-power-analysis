@@ -100,10 +100,10 @@ def main() -> None:
     dictionary.to_csv(paths.ANALYSIS_DICTIONARY, index=False)
     row_counts.to_csv(paths.ROW_COUNTS, index=False)
     logger.info(
-        "Output    wrote %d rows x %d columns to %s; max_power_w missing in %d rows",
+        "Output    wrote %d rows x %d columns to %s; missing cells: %d",
         *analysis.shape,
         paths.ANALYSIS_PARQUET.relative_to(paths.ROOT),
-        int(analysis["max_power_w"].isna().sum()),
+        int(analysis.isna().sum().sum()),
     )
 
 

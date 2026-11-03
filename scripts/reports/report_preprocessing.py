@@ -26,9 +26,9 @@ GENERATED = paths.ROOT / "report" / "generated"
 NUMBERS_OUTPUT = GENERATED / "preprocessing_numbers.tex"
 SAMPLE_ROWS_OUTPUT = GENERATED / "preprocessing_sample_rows.tex"
 
-# Cards shown after preprocessing: an old card, one missing power, one with the
-# "(xN)" TMUs repair and one missing core speed.
-SAMPLE_GPU_IDS = [1721, 1679, 2180, 1434]
+# Cards shown after preprocessing: an old Nvidia card, an AMD card, a laptop card
+# and one with the "(xN)" TMUs repair.
+SAMPLE_GPU_IDS = [1721, 1968, 875, 2180]
 SAMPLE_COLUMNS = {
     "name": "{}",
     "release_year": "{:d}",
@@ -88,6 +88,12 @@ def identity_mismatches(parsed: pd.DataFrame) -> dict[str, int]:
         "BandwidthMismatchBefore": before["bandwidth_mismatch"],
         "BandwidthMismatchAfter": after["bandwidth_mismatch"],
     }
+
+
+def year_range(years: pd.Series) -> str:
+    """'2017' for a single year, '2016--2017' (en dash in LaTeX) otherwise."""
+    first, last = int(years.min()), int(years.max())
+    return str(first) if first == last else f"{first}--{last}"
 
 
 def decimal(value: float, digits: int = 1) -> str:
@@ -231,6 +237,8 @@ def numbers() -> dict[str, str | int]:
     parsed = pre.parse_columns(cleaned)
     rows, row_counts = pre.filter_rows(parsed)
     analysis = pre.derive_variables(rows)
+    # The in-scope rows before incomplete ones are dropped, to describe what is lost.
+    scoped = pre.derive_variables(pre.filter_rows(parsed, drop_missing=False)[0])
     counts = dict(zip(row_counts["step"], row_counts["rows"], strict=True))
     return {
         "RowsRaw": len(raw),
@@ -245,6 +253,11 @@ def numbers() -> dict[str, str | int]:
             selected["Name"]
             .str.contains("|".join(pre.ENCODING_FIXES), regex=True)
             .sum()
+        ),
+        "RepairedYears": year_range(
+            parsed.set_index("gpu_id")
+            .loc[analysis["gpu_id"]]
+            .query("spec_multiplier > 1")["release_year"]
         ),
         "RepairedInFinal": int(
             parsed.set_index("gpu_id")
@@ -272,7 +285,11 @@ def numbers() -> dict[str, str | int]:
         "RowsDedicated": counts["dedicated GPU"],
         "RowsSingleGpu": counts["not a multi-GPU product"],
         "RowsReleased": counts["released"],
-        "RowsFinal": counts["not an exact duplicate"],
+        "RowsScoped": counts["not an exact duplicate"],
+        "RowsFinal": counts["no missing value"],
+        "IncompleteRemoved": counts["not an exact duplicate"]
+        - counts["no missing value"],
+        "IntelFinal": int(analysis["manufacturer"].eq("Intel").sum()),
         "MultiGpuRemoved": counts["dedicated GPU"] - counts["not a multi-GPU product"],
         "UnreleasedRemoved": counts["not a multi-GPU product"] - counts["released"],
         "DuplicatesRemoved": counts["released"] - counts["not an exact duplicate"],
@@ -282,9 +299,9 @@ def numbers() -> dict[str, str | int]:
         "ColsFinal": analysis.shape[1],
         "Desktop": int(analysis["segment"].eq("Desktop").sum()),
         "Laptop": int(analysis["segment"].eq("Laptop").sum()),
-        **missingness(analysis),
-        **imputation_effect(analysis),
-        **missing_by_column(analysis),
+        **missingness(scoped),
+        **imputation_effect(scoped),
+        **missing_by_column(scoped),
     }
 
 
