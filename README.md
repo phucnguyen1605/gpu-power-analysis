@@ -20,6 +20,7 @@ pip install -e . --no-deps           # để import được package gpu_power_a
 
 ```bash
 python scripts/01_preprocess.py                  # tiền xử lý: dữ liệu thô -> dữ liệu cho đề tài
+python scripts/02_anova_two_way.py               # chạy ANOVA 2 chiều trên dữ liệu đã làm sạch
 python scripts/reports/report_overview.py        # số liệu cho mục tổng quan dữ liệu (LaTeX)
 python scripts/reports/report_preprocessing.py   # số liệu cho mục tiền xử lý của báo cáo (LaTeX)
 (cd report && tectonic preview_section1.tex)     # xem trước mục 1 (cần cài Tectonic)
@@ -44,9 +45,11 @@ gpu-power-analysis/
 ├── src/gpu_power_analysis/
 │   ├── paths.py                         đường dẫn tới mọi file
 │   ├── parsers.py                       các hàm đổi chuỗi thành số, ngày, Yes/No
-│   └── preprocess.py                    6 bước tiền xử lý, mỗi bước một hàm
+│   ├── preprocess.py                    6 bước tiền xử lý, mỗi bước một hàm
+│   └── anova.py                         ANOVA hai chiều, giả định, hậu kiểm và kết luận
 ├── scripts/
 │   ├── 01_preprocess.py                 chạy tiền xử lý, in kết quả từng bước
+│   ├── 02_anova_two_way.py              chạy ANOVA hai chiều trên dữ liệu đã làm sạch
 │   └── reports/
 │       ├── report_overview.py           sinh số liệu và bảng biến cho mục 1
 │       └── report_preprocessing.py      sinh số liệu cho mục 3 của báo cáo
@@ -57,8 +60,10 @@ gpu-power-analysis/
 │   ├── generated/                       macro số liệu và bảng mẫu (do script sinh ra)
 │   ├── preview_section1.tex             file xem trước mục 1
 │   └── preview_section3.tex             file xem trước mục 3
-├── tests/test_parsers.py                test cho các hàm đọc giá trị
-└── tests/test_preprocess.py             test cho quy trình tiền xử lý
+├── tests/
+│   ├── test_anova.py                    test cho ANOVA hai chiều
+│   ├── test_parsers.py                  test cho các hàm đọc giá trị
+│   └── test_preprocess.py               test cho quy trình tiền xử lý
 ```
 
 ## Tiền xử lý (`scripts/01_preprocess.py`)
