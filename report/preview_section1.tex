@@ -1,0 +1,23 @@
+% Xem trước riêng Mục 1 khi chưa ghép vào báo cáo chính.
+% Biên dịch từ thư mục report/:
+%   python ../scripts/reports/report_overview.py   (nếu dữ liệu thay đổi)
+%   tectonic preview_section1.tex
+\documentclass[12pt,a4paper]{article}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{fontspec}
+\setmainfont{texgyretermes}[Extension=.otf,UprightFont=*-regular,
+  BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
+\setmonofont{DejaVuSansMono}[Extension=.ttf,Scale=0.85,BoldFont=*-Bold]
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,longtable,array}
+\usepackage{caption}
+\usepackage{url}
+
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\figurename}{Hình}
+
+\input{generated/overview_numbers.tex}
+
+\begin{document}
+\input{sections/01_overview.tex}
+\end{document}

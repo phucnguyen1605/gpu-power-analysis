@@ -20,14 +20,17 @@ pip install -e . --no-deps           # để import được package gpu_power_a
 
 ```bash
 python scripts/01_preprocess.py                  # tiền xử lý: dữ liệu thô -> dữ liệu cho đề tài
+python scripts/reports/report_overview.py        # số liệu cho mục tổng quan dữ liệu (LaTeX)
 python scripts/reports/report_preprocessing.py   # số liệu cho mục tiền xử lý của báo cáo (LaTeX)
+(cd report && tectonic preview_section1.tex)     # xem trước mục 1 (cần cài Tectonic)
 (cd report && tectonic preview_section3.tex)     # xem trước mục 3 (cần cài Tectonic)
 pytest                                           # chạy test
 ruff format . && ruff check .                    # format và kiểm tra code trước khi commit
 ```
 
 Dữ liệu gốc `data/raw/All_GPUs.csv` có sẵn trong repo, không cần tải từ Kaggle. Các file
-sinh ra (`data/processed/`, `report/generated/`, `report/preview_section3.pdf`) cũng được
+sinh ra (`data/processed/`, `report/generated/`, `report/preview_section1.pdf`,
+`report/preview_section3.pdf`) cũng được
 lưu trong git để cả nhóm dùng ngay mà không cần chạy code. **Khi sửa code, chạy lại các
 lệnh trên và commit các file sinh ra cùng với code.**
 
@@ -44,10 +47,15 @@ gpu-power-analysis/
 │   └── preprocess.py                    6 bước tiền xử lý, mỗi bước một hàm
 ├── scripts/
 │   ├── 01_preprocess.py                 chạy tiền xử lý, in kết quả từng bước
-│   └── reports/report_preprocessing.py  sinh số liệu cho mục 3 của báo cáo
+│   └── reports/
+│       ├── report_overview.py           sinh số liệu và bảng biến cho mục 1
+│       └── report_preprocessing.py      sinh số liệu cho mục 3 của báo cáo
 ├── report/
-│   ├── sections/03_preprocessing.tex    mục 3 (Tiền xử lý số liệu)
+│   ├── sections/
+│   │   ├── 01_overview.tex              mục 1 (Tổng quan dữ liệu)
+│   │   └── 03_preprocessing.tex         mục 3 (Tiền xử lý số liệu)
 │   ├── generated/                       macro số liệu và bảng mẫu (do script sinh ra)
+│   ├── preview_section1.tex             file xem trước mục 1
 │   └── preview_section3.tex             file xem trước mục 3
 ├── tests/test_parsers.py                test cho các hàm đọc giá trị
 └── tests/test_preprocess.py             test cho quy trình tiền xử lý
