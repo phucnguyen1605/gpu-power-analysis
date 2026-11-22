@@ -94,17 +94,17 @@ def test_real_gpu_unbalanced_type_iii_matches_harmonic_mean_formula():
         raw_sample, raw_col, "manufacturer", "segment", alpha=0.05, ss_type="III"
     )
 
-    assert raw_res.n_obs == 1770
+    assert raw_res.n_obs == 1980
     assert len(raw_res.tukey_table) == 6
     cell_counts = {
         (row.manufacturer, row.segment): int(row.count)
         for row in raw_res.cell_summary.itertuples()
     }
     assert cell_counts == {
-        ("AMD", "Desktop"): 545,
-        ("AMD", "Laptop"): 92,
-        ("Nvidia", "Desktop"): 988,
-        ("Nvidia", "Laptop"): 145,
+        ("AMD", "Desktop"): 677,
+        ("AMD", "Laptop"): 117,
+        ("Nvidia", "Desktop"): 1032,
+        ("Nvidia", "Laptop"): 154,
     }
 
     means = {

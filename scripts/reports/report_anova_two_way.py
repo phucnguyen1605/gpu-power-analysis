@@ -70,10 +70,17 @@ def signed_dec(value: float, digits: int = 2) -> str:
 
 
 def fmt_p(value: float) -> str:
-    """Format a p-value with a Vietnamese decimal comma or lower bound."""
+    """Format a p-value for table cells with a Vietnamese decimal comma."""
     if value < 0.001:
         return "$<$ 0{,}001"
     return dec(value, 4)
+
+
+def fmt_p_rel(value: float) -> str:
+    """Format a p-value with a relation sign (< or =) for inline prose."""
+    if value < 0.001:
+        return "$<$ 0{,}001"
+    return "$=$ " + dec(value, 4)
 
 
 def fmt_decision(reject: Any) -> str:
@@ -243,6 +250,12 @@ def collect_macros(
     amd_desk_geom = float(np.exp(log_cells.at[("AMD", "Desktop"), "mean"]))
     lap_ratio_pct = 100.0 * (nv_lap_geom / amd_lap_geom - 1.0)
     desk_ratio_pct = 100.0 * (nv_desk_geom / amd_desk_geom - 1.0)
+    raw_lap_gap = float(
+        raw_cells.at[("Nvidia", "Laptop"), "mean"]
+        - raw_cells.at[("AMD", "Laptop"), "mean"]
+    )
+    desk_lap_diffs = raw_res.tukey_table.loc[raw_res.tukey_table["reject_h0"], "diff"]
+    log_norm = log_res.cell_normality.set_index(["manufacturer", "segment"])
 
     return {
         "Alpha": dec(ALPHA, 2),
@@ -264,47 +277,60 @@ def collect_macros(
         "RawNvidiaLaptopMean": dec(
             float(raw_cells.at[("Nvidia", "Laptop"), "mean"]), 2
         ),
+        "RawLaptopGapW": dec(raw_lap_gap, 2),
         "RawAmdDesktopSd": dec(float(raw_cells.at[("AMD", "Desktop"), "std"]), 2),
         "RawAmdLaptopSd": dec(float(raw_cells.at[("AMD", "Laptop"), "std"]), 2),
         "RawLeveneW": dec(raw_res.levene_stat, 3),
-        "RawLeveneP": fmt_p(raw_res.levene_p),
+        "RawLeveneP": fmt_p_rel(raw_res.levene_p),
         "RawSdRatio": dec(raw_res.sd_ratio, 2),
         "RawShapiroW": dec(raw_res.shapiro_residuals_stat, 4),
-        "RawShapiroP": fmt_p(raw_res.shapiro_residuals_p),
+        "RawShapiroP": fmt_p_rel(raw_res.shapiro_residuals_p),
         "RawMsErr": dec_int_sep(float(raw_tbl.at["Residual", "ms"]), 1),
         "RawFMaker": dec(float(raw_tbl.at["manufacturer", "f_stat"]), 3),
-        "RawPMaker": fmt_p(float(raw_tbl.at["manufacturer", "p_value"])),
+        "RawPMaker": fmt_p_rel(float(raw_tbl.at["manufacturer", "p_value"])),
         "RawEtaMaker": dec(float(raw_tbl.at["manufacturer", "partial_eta_sq"]), 4),
         "RawFSeg": dec(float(raw_tbl.at["segment", "f_stat"]), 3),
-        "RawPSeg": fmt_p(float(raw_tbl.at["segment", "p_value"])),
+        "RawPSeg": fmt_p_rel(float(raw_tbl.at["segment", "p_value"])),
         "RawEtaSeg": dec(float(raw_tbl.at["segment", "partial_eta_sq"]), 4),
+        "RawEtaSegPct": dec(
+            100.0 * float(raw_tbl.at["segment", "partial_eta_sq"]), 1
+        ),
         "RawFInter": dec(float(raw_tbl.at["manufacturer:segment", "f_stat"]), 3),
-        "RawPInter": fmt_p(float(raw_tbl.at["manufacturer:segment", "p_value"])),
+        "RawPInter": fmt_p_rel(float(raw_tbl.at["manufacturer:segment", "p_value"])),
         "RawEtaInter": dec(
             float(raw_tbl.at["manufacturer:segment", "partial_eta_sq"]), 4
         ),
+        "RawTukeyMinDeskLapW": dec(float(desk_lap_diffs.abs().min()), 2),
+        "RawTukeyMaxDeskLapW": dec(float(desk_lap_diffs.abs().max()), 2),
         "RawWelchLaptopT": dec(
             float(raw_simple.at[("segment", "Laptop", "AMD", "Nvidia"), "welch_t"]), 3
         ),
-        "RawWelchLaptopP": fmt_p(
+        "RawWelchLaptopP": fmt_p_rel(
             float(raw_simple.at[("segment", "Laptop", "AMD", "Nvidia"), "p_value"])
         ),
-        "RawWelchDesktopP": fmt_p(
+        "RawWelchDesktopP": fmt_p_rel(
             float(raw_simple.at[("segment", "Desktop", "AMD", "Nvidia"), "p_value"])
         ),
         "LogLeveneW": dec(log_res.levene_stat, 3),
-        "LogLeveneP": fmt_p(log_res.levene_p),
+        "LogLeveneP": fmt_p_rel(log_res.levene_p),
         "LogSdRatio": dec(log_res.sd_ratio, 2),
         "LogShapiroW": dec(log_res.shapiro_residuals_stat, 4),
-        "LogShapiroP": fmt_p(log_res.shapiro_residuals_p),
+        "LogShapiroP": fmt_p_rel(log_res.shapiro_residuals_p),
+        "LogAmdLapShapiroW": dec(float(log_norm.at[("AMD", "Laptop"), "shapiro_w"]), 4),
+        "LogAmdLapShapiroP": fmt_p_rel(
+            float(log_norm.at[("AMD", "Laptop"), "p_value"])
+        ),
         "LogFMaker": dec(float(log_tbl.at["manufacturer", "f_stat"]), 3),
-        "LogPMaker": fmt_p(float(log_tbl.at["manufacturer", "p_value"])),
+        "LogPMaker": fmt_p_rel(float(log_tbl.at["manufacturer", "p_value"])),
         "LogEtaMaker": dec(float(log_tbl.at["manufacturer", "partial_eta_sq"]), 4),
         "LogFSeg": dec(float(log_tbl.at["segment", "f_stat"]), 3),
-        "LogPSeg": fmt_p(float(log_tbl.at["segment", "p_value"])),
+        "LogPSeg": fmt_p_rel(float(log_tbl.at["segment", "p_value"])),
         "LogEtaSeg": dec(float(log_tbl.at["segment", "partial_eta_sq"]), 4),
+        "LogEtaSegPct": dec(
+            100.0 * float(log_tbl.at["segment", "partial_eta_sq"]), 1
+        ),
         "LogFInter": dec(float(log_tbl.at["manufacturer:segment", "f_stat"]), 3),
-        "LogPInter": fmt_p(float(log_tbl.at["manufacturer:segment", "p_value"])),
+        "LogPInter": fmt_p_rel(float(log_tbl.at["manufacturer:segment", "p_value"])),
         "LogEtaInter": dec(
             float(log_tbl.at["manufacturer:segment", "partial_eta_sq"]), 4
         ),
@@ -314,7 +340,7 @@ def collect_macros(
         "GeomNvidiaLaptop": dec(nv_lap_geom, 1),
         "LaptopGeomGapPct": dec(lap_ratio_pct, 1),
         "DesktopGeomGapPct": dec(desk_ratio_pct, 1),
-        "LogTukeyDeskP": fmt_p(
+        "LogTukeyDeskP": fmt_p_rel(
             float(
                 log_res.tukey_table.loc[
                     log_res.tukey_table["group_1"].eq("AMD-Desktop")
@@ -323,7 +349,7 @@ def collect_macros(
                 ].iloc[0]
             )
         ),
-        "LogTukeyLapP": fmt_p(
+        "LogTukeyLapP": fmt_p_rel(
             float(
                 log_res.tukey_table.loc[
                     log_res.tukey_table["group_1"].eq("AMD-Laptop")
@@ -332,10 +358,10 @@ def collect_macros(
                 ].iloc[0]
             )
         ),
-        "LogWelchDesktopP": fmt_p(
+        "LogWelchDesktopP": fmt_p_rel(
             float(log_simple.at[("segment", "Desktop", "AMD", "Nvidia"), "p_value"])
         ),
-        "LogWelchLaptopP": fmt_p(
+        "LogWelchLaptopP": fmt_p_rel(
             float(log_simple.at[("segment", "Laptop", "AMD", "Nvidia"), "p_value"])
         ),
     }
