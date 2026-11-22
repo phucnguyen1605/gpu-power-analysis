@@ -11,6 +11,8 @@ Outputs (data/processed/):
     gpus_analysis.csv                   for people: open in a spreadsheet
     gpus_analysis_dictionary.csv        role, use, type and missing share per column
     row_counts.csv                      rows left after each filter
+    gpus_in_scope.parquet / .csv        in-scope rows before incomplete ones are
+                                        dropped, for sensitivity checks
 """
 
 import logging
@@ -73,6 +75,12 @@ def main() -> None:
         "          consistency between related columns: %s",
         pre.check_consistency(parsed),
     )
+    for name in cleaned.loc[pre.invalid_max_power(cleaned), "Name"]:
+        logger.info(
+            "          known wrong Max_Power set to missing: %s (%s)",
+            name,
+            pre.INVALID_MAX_POWER[name],
+        )
 
     rows, row_counts = pre.filter_rows(parsed)
     logger.info("Step 5/6  filter rows:")
@@ -94,16 +102,26 @@ def main() -> None:
         with_power.value_counts().to_dict(),
     )
 
+    # Same scope and columns, but incomplete rows are kept (with NA).
+    in_scope = pre.derive_variables(pre.filter_rows(parsed, drop_missing=False)[0])
     dictionary = pre.describe_columns(analysis)
     analysis.to_parquet(paths.ANALYSIS_PARQUET, index=False)
     analysis.to_csv(paths.ANALYSIS_CSV, index=False)
     dictionary.to_csv(paths.ANALYSIS_DICTIONARY, index=False)
     row_counts.to_csv(paths.ROW_COUNTS, index=False)
+    in_scope.to_parquet(paths.IN_SCOPE_PARQUET, index=False)
+    in_scope.to_csv(paths.IN_SCOPE_CSV, index=False)
     logger.info(
-        "Output    wrote %d rows x %d columns to %s; missing cells: %d",
+        "Output    wrote %d rows x %d columns to %s; missing cells: %s",
         *analysis.shape,
         paths.ANALYSIS_PARQUET.relative_to(paths.ROOT),
-        int(analysis.isna().sum().sum()),
+        analysis.isna().sum().loc[lambda counts: counts > 0].to_dict(),
+    )
+    logger.info(
+        "          wrote %d in-scope rows (%d with rated power) to %s",
+        len(in_scope),
+        int(in_scope["max_power_w"].notna().sum()),
+        paths.IN_SCOPE_PARQUET.relative_to(paths.ROOT),
     )
 
 

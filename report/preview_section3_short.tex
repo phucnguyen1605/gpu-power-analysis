@@ -1,0 +1,49 @@
+% Xem trước riêng Mục 3 khi chưa ghép vào báo cáo chính.
+% Biên dịch từ thư mục report/:
+%   python ../scripts/reports/report_preprocessing.py   (nếu dữ liệu thay đổi)
+%   tectonic preview_section3.tex
+\documentclass[12pt,a4paper]{article}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{fontspec}
+\setmainfont{texgyretermes}[Extension=.otf,UprightFont=*-regular,
+  BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
+\setmonofont{DejaVuSansMono}[Extension=.ttf,Scale=0.85,BoldFont=*-Bold]
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,tabularx,array}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\lstlistingname}{Đoạn code}
+\renewcommand{\refname}{Tài liệu tham khảo}
+% Đánh số theo mục (Bảng 3.1, Hình 3.1) để không phụ thuộc vào các mục khác.
+\counterwithin{table}{section}
+\counterwithin{figure}{section}
+\AtBeginDocument{\counterwithin{lstlisting}{section}}
+\lstset{basicstyle=\small\ttfamily, keywordstyle=\color{blue},
+  stringstyle=\color{violet}, frame=tb, breaklines=true,
+  showstringspaces=false, columns=flexible}
+
+\input{generated/preprocessing_numbers.tex}
+
+\begin{document}
+\setcounter{section}{2}
+\input{sections/03_preprocessing_short.tex}
+
+% Mục 3 trích dẫn hai tài liệu này; file chính cần có cùng khóa vandenbroeck2005
+% và donders2006.
+\begin{thebibliography}{9}
+  \bibitem{vandenbroeck2005} J.~Van den Broeck, S.~Argeseanu Cunningham, R.~Eeckels, and
+    K.~Herbst, ``Data cleaning: Detecting, diagnosing, and editing data abnormalities,''
+    \emph{PLoS Med.}, vol.~2, no.~10, p.~e267, 2005, doi: 10.1371/journal.pmed.0020267.
+  \bibitem{donders2006} A.~R.~T. Donders, G.~J.~M.~G. van der Heijden, T.~Stijnen, and
+    K.~G.~M. Moons, ``Review: A gentle introduction to imputation of missing values,''
+    \emph{J. Clin. Epidemiol.}, vol.~59, no.~10, pp.~1087--1091, 2006,
+    doi: 10.1016/j.jclinepi.2006.01.014.
+\end{thebibliography}
+\end{document}

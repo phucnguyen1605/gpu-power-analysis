@@ -80,9 +80,9 @@ gpu-power-analysis/
 | 1 | `read_raw` | Đọc mọi cột dưới dạng chuỗi, chưa đổi giá trị nào; gán `gpu_id` | 3406 dòng × 34 cột |
 | 2 | `select_columns` | Chỉ giữ 18 cột cần cho đề tài (`USED_COLUMNS`) | 18 cột |
 | 3 | `clean_text` | Xóa khoảng trắng; đổi ô trống, `"-"`, `"Unknown Release Date"` thành giá trị thiếu; sửa lỗi mã hóa tên | `"\n01-Mar-2009 "` → `"01-Mar-2009"` |
-| 4 | `parse_columns` | Tách đơn vị, đổi kiểu, sửa lỗi `(xN)`; **gặp định dạng lạ thì dừng và báo lỗi**; `check_consistency` kiểm tra kết quả | `"738 MHz"` → 738; `"800MB/sec"` → 0,8; TMUs `56` → 224 khi ROPs ghi `"24 (x4)"` |
-| 5 | `filter_rows` | Giữ GPU rời → bỏ cấu hình nhiều GPU → bỏ card chưa phát hành → bỏ dòng trùng → **bỏ dòng có ô khuyết** | 3406 → 3018 → 2775 → 2762 → 2762 → 1838 dòng |
-| 6 | `derive_variables` | Thêm `segment`, `needs_aux_power` (trên 75 W, chỉ có ý nghĩa với card desktop), `texture_rate_per_watt`, `memory_type_group` (gộp các loại có dưới 30 card thành "Other"); giữ 16 cột cuối | 1601 desktop, 237 laptop; không còn ô khuyết |
+| 4 | `parse_columns` | Tách đơn vị, đổi kiểu, sửa lỗi `(xN)`; đổi giá trị công suất sai đã biết (`INVALID_MAX_POWER`) thành giá trị thiếu; **gặp định dạng lạ thì dừng và báo lỗi**; `check_consistency` kiểm tra kết quả | `"738 MHz"` → 738; `"800MB/sec"` → 0,8; TMUs `56` → 224 khi ROPs ghi `"24 (x4)"`; `"1 Watts"` của Radeon HD 6850 Club-3D OC Edition → NA |
+| 5 | `filter_rows` | Giữ GPU rời → bỏ cấu hình nhiều GPU → bỏ card chưa phát hành → bỏ dòng trùng → **bỏ dòng thiếu biến bắt buộc** (mọi cột trừ `core_speed_mhz`) | 3406 → 3018 → 2775 → 2762 → 2762 → 2057 dòng |
+| 6 | `derive_variables` | Thêm `segment`, `needs_aux_power` (trên 75 W, chỉ có ý nghĩa với card desktop), `texture_rate_per_watt`, `memory_type_group` (gộp các loại có dưới 30 card thành "Other"); giữ 16 cột cuối | 1786 desktop, 271 laptop; chỉ `core_speed_mhz` còn ô khuyết (220 dòng) |
 
 Sau 6 bước, `describe_columns` tạo từ điển dữ liệu (cột `role`: vai trò, `used_in`: phân
 tích sử dụng) rồi script ghi các file đầu ra.
@@ -95,6 +95,7 @@ tích sử dụng) rồi script ghi các file đầu ra.
 | `gpus_analysis.csv` | Người xem: mở bằng bảng tính để kiểm tra |
 | `gpus_analysis_dictionary.csv` | Từ điển dữ liệu |
 | `row_counts.csv` | Số dòng sau từng bước lọc |
+| `gpus_in_scope.parquet`, `gpus_in_scope.csv` | Kiểm tra độ nhạy: 2762 dòng trong phạm vi đề tài **trước khi** loại dòng khuyết (cùng 16 cột, ô khuyết là NA; 2280 dòng có công suất) |
 
 ### Các cột được chọn (bước 2)
 
@@ -169,7 +170,8 @@ bằng thông số trong chính dữ liệu: card hai chip có TMUs và độ r�
 | Biến mục tiêu (`response`) | `max_power_w` | Mọi phân tích |
 | Biến tạo từ mục tiêu (`derived_response`) | `needs_aux_power` (công suất trên 75 W) | Thống kê mô tả; khoảng tin cậy cho tỉ lệ card cần nguồn phụ |
 | | `texture_rate_per_watt` (hiệu quả năng lượng) | Thống kê mô tả; thảo luận |
-| Biến giải thích (`predictor`) | `tmus`, `core_speed_mhz`, `memory_bandwidth_gb_s`, `memory_mb`, `process_nm` | Thống kê mô tả; hồi quy; kiểm chứng ngoài mẫu |
+| Biến giải thích (`predictor`) | `tmus`, `memory_bandwidth_gb_s`, `memory_mb`, `process_nm` | Thống kê mô tả; hồi quy; kiểm chứng ngoài mẫu |
+| Biến phụ (`auxiliary`) | `core_speed_mhz` (được phép khuyết; không nằm trong mô hình chính) | Thống kê mô tả; phân tích độ nhạy (so sánh các card cùng chip) |
 | Biến phân nhóm (`grouping`) | `manufacturer`, `segment` | Thống kê mô tả; so sánh hai nhóm; ANOVA; hồi quy |
 | | `memory_type` | Thống kê mô tả (bảng tần số trước khi gộp nhóm) |
 | | `memory_type_group` | Thống kê mô tả; ANOVA |
@@ -179,14 +181,23 @@ bằng thông số trong chính dữ liệu: card hai chip có TMUs và độ r�
 ### Nguyên tắc và phạm vi
 
 - **Không điền giá trị thiếu; loại bỏ các dòng thiếu ngay ở bước 5** (theo góp ý của
-  thầy), để mọi phân tích dùng chung một bộ dữ liệu đầy đủ: 924/2762 dòng bị loại, còn
-  1838 dòng. Hệ quả: dữ liệu chỉ còn card phát hành 2006–2017 và không còn card Intel;
+  thầy), để mọi phân tích dùng chung một bộ dữ liệu: 705/2762 dòng bị loại, còn
+  2057 dòng. Hệ quả: dữ liệu chỉ còn card phát hành 2003–2017 và không còn card Intel;
   card thiếu công suất thường là card đời cũ và card AMD, nên kết quả nghiêng về card đời
   mới (mục 3.7 của báo cáo).
+- **Xung nhịp (`core_speed_mhz`) là cột duy nhất được phép khuyết.** Đây là biến khuyết
+  nhiều nhất (22%); nếu bắt buộc phải có thì chỉ còn 1837 dòng. Xung nhịp có ảnh hưởng
+  tới công suất khi so các card cùng chip (cao hơn 1% thì công suất cao hơn khoảng 0,5%),
+  nhưng giữa các chip nó đi liền với tiến trình và năm phát hành (tương quan −0,74 và
+  0,75) nên không tách riêng được. Vì vậy nó không nằm trong mô hình chính; cột được giữ
+  để so sánh trong cùng chip (mục 3.7 của báo cáo). Khi dùng cột này phải tự lọc `NA`.
 - **14 dòng không rõ GPU rời hay tích hợp bị loại** theo quy tắc `Dedicated = Yes`,
   không điền tay. Không dòng nào trong số đó đủ biến cho mô hình hồi quy.
 - **Không sửa tay giá trị** theo nguồn bên ngoài; chỉ sửa các lỗi phát hiện được một cách
-  có hệ thống từ chính dữ liệu (lỗi `(xN)`).
+  có hệ thống từ chính dữ liệu (lỗi `(xN)`). Một giá trị sai rõ ràng mà không tính lại
+  được (công suất 1 W của Radeon HD 6850 Club-3D OC Edition, trong khi các card cùng chip
+  ghi 127 W) được đổi thành giá trị thiếu chứ không điền số khác; danh sách này nằm ở
+  `INVALID_MAX_POWER`.
 - Tiền xử lý chỉ tạo những biến mới mà nhiều phân tích phải dùng **cùng một định nghĩa**
   (ngưỡng 75 W, cách gộp nhóm bộ nhớ). **Ngoại lai, biến đổi log và mẫu riêng của từng
   mô hình** do mỗi phân tích tự làm (ví dụ lấy log ngay trong công thức hồi quy).
@@ -194,17 +205,17 @@ bằng thông số trong chính dữ liệu: card hai chip có TMUs và độ r�
 ## Dữ liệu này dùng được cho những phân tích nào
 
 Phần này chỉ là **gợi ý**: nêu cột cần dùng, cách lọc và số dòng sẵn có. Việc chọn phương
-pháp, xử lý ngoại lai và lấy log do từng phân tích tự quyết định. Bộ dữ liệu không còn ô
-thiếu, nên không cần lọc thêm theo giá trị thiếu.
+pháp, xử lý ngoại lai và lấy log do từng phân tích tự quyết định. Chỉ cột
+`core_speed_mhz` còn ô thiếu; các cột khác đầy đủ nên không cần lọc thêm theo giá trị thiếu.
 
 | Phân tích | Cột chính | Cách lọc | Dữ liệu sẵn có |
 |---|---|---|---|
-| Thống kê mô tả | `max_power_w` và các cột còn lại | Không | 1838 GPU, năm 2006–2017 |
-| Khoảng tin cậy cho tỉ lệ card cần nguồn phụ | `needs_aux_power` | Desktop | 1601 GPU, trong đó 1150 card trên 75 W |
-| So sánh hai nhóm | `max_power_w` theo `segment` hoặc `manufacturer` | Nvidia và AMD khi so sánh hãng | Desktop 1601 / laptop 237; Nvidia 1133 / AMD 637 |
-| ANOVA | `max_power_w` theo `memory_type_group`; hoặc theo `manufacturer` × `segment` | Nvidia và AMD cho ANOVA hai yếu tố | 5 nhóm bộ nhớ, nhóm nhỏ nhất 25 card (Other); bảng hãng × phân khúc, ô nhỏ nhất 92 card |
-| Hồi quy | `max_power_w` theo `tmus`, `core_speed_mhz`, `memory_bandwidth_gb_s`, `memory_mb`, `process_nm`, `manufacturer`; cụm theo `architecture` | Desktop, Nvidia và AMD | 1533 card thuộc 155 kiến trúc chip; mọi biến đều dương nên lấy log được |
-| Kiểm chứng ngoài mẫu theo thời gian | Như hồi quy, chia theo `release_year` | Như hồi quy | 1083 card đến 2014, 450 card 2015–2017 |
+| Thống kê mô tả | `max_power_w` và các cột còn lại | Không | 2057 GPU, năm 2003–2017 |
+| Khoảng tin cậy cho tỉ lệ card cần nguồn phụ | `needs_aux_power` | Desktop | 1786 GPU, trong đó 1269 card trên 75 W |
+| So sánh hai nhóm | `max_power_w` theo `segment` hoặc `manufacturer` | Nvidia và AMD khi so sánh hãng | Desktop 1786 / laptop 271; Nvidia 1186 / AMD 794 |
+| ANOVA | `max_power_w` theo `memory_type_group`; hoặc theo `manufacturer` × `segment` | Nvidia và AMD cho ANOVA hai yếu tố | 6 nhóm bộ nhớ, nhóm nhỏ nhất 18 card (Other); bảng hãng × phân khúc, ô nhỏ nhất 117 card |
+| Hồi quy | `max_power_w` theo `tmus`, `memory_bandwidth_gb_s`, `memory_mb`, `process_nm`, `manufacturer`; cụm theo `architecture` | Desktop, Nvidia và AMD | 1709 card thuộc 219 kiến trúc chip; mọi biến đều dương nên lấy log được. Nếu thêm `core_speed_mhz` thì còn 1532 card |
+| Kiểm chứng ngoài mẫu theo thời gian | Như hồi quy, chia theo `release_year` | Như hồi quy | 1170 card đến 2014, 539 card 2015–2017 |
 
 Ví dụ lấy mẫu cho hồi quy:
 
@@ -214,7 +225,7 @@ from gpu_power_analysis.preprocess import load_analysis
 gpus = load_analysis()
 sample = gpus[
     gpus["segment"].eq("Desktop") & gpus["manufacturer"].isin(["Nvidia", "AMD"])
-]  # 1533 rows, no missing value
+]  # 1709 rows; only core_speed_mhz can be missing
 ```
 
 ## Quy chuẩn code

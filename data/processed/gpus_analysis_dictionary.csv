@@ -11,7 +11,7 @@ max_power_w,response,all analyses,Float64,0,0.0,Rated maximum power (W)
 needs_aux_power,derived_response,descriptive statistics; confidence interval for a proportion,boolean,0,0.0,max_power_w above the 75 W a PCIe slot supplies
 texture_rate_per_watt,derived_response,descriptive statistics; discussion,Float64,0,0.0,Energy efficiency: texture fill rate (GTexel/s) per watt
 tmus,predictor,descriptive statistics; regression; out-of-sample validation,Float64,0,0.0,Texture mapping units
-core_speed_mhz,predictor,descriptive statistics; regression; out-of-sample validation,Float64,0,0.0,Base core clock (MHz)
 memory_bandwidth_gb_s,predictor,descriptive statistics; regression; out-of-sample validation,Float64,0,0.0,Memory bandwidth (GB/s)
 memory_mb,predictor,descriptive statistics; regression; out-of-sample validation,Float64,0,0.0,Video memory (MB)
 process_nm,predictor,descriptive statistics; regression; out-of-sample validation,Float64,0,0.0,Manufacturing process (nm)
+core_speed_mhz,auxiliary,descriptive statistics; sensitivity analysis,Float64,220,10.7,"Base core clock (MHz); may be missing, not in the main model"

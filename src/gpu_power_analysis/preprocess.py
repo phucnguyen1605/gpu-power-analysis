@@ -5,15 +5,20 @@ Steps (the same six steps as the report):
     2. select_columns    keep only the raw columns the project needs
     3. clean_text        trim whitespace, mark missing values, fix encoding
     4. parse_columns     convert units and types; repair the "(xN)" error
-                         (check_consistency verifies the repair)
+                         (check_consistency verifies the repair); set known
+                         wrong values to missing
     5. filter_rows       keep dedicated, single-GPU, released, unique rows
-                         with no missing value
+                         with no missing required value
     6. derive_variables  add shared variables; keep the final columns
 
 describe_columns then builds the data dictionary written with the outputs.
 
-Rows with a missing value are dropped at the end of step 5, so every analysis
-uses the same complete dataset; nothing is imputed. Outliers, log transforms
+Rows missing a required value are dropped at the end of step 5, so every
+analysis uses the same dataset; nothing is imputed. Every column is required
+except the core clock (OPTIONAL_COLUMNS): it is the column missing most often
+and is not in the main model, so it may be NA in the final dataset. The
+in-scope rows before that last filter are written as well, so an analysis can
+be repeated on more rows as a sensitivity check. Outliers, log transforms
 and model samples are not handled here; each analysis does them in its own
 context.
 """
@@ -30,6 +35,17 @@ UNKNOWN_DATE = "Unknown Release Date"
 
 # Text that was mis-encoded in the raw file (UTF-8 read as Latin-1).
 ENCODING_FIXES = {"Â²": "²"}
+
+# Max_Power values that are present in the raw file but wrong, by product name.
+# They are set to missing in step 4, so the row is dropped like any other card
+# without a rated power. The raw value is listed too: a corrected source file
+# is then left alone. Entries are single documented data-entry errors, not a
+# threshold rule: genuine laptop chips are rated as low as 5 W.
+INVALID_MAX_POWER = {
+    # A desktop Barts Pro card; the other cards on that chip list 127 W, and
+    # this one recommends the same 500 W power supply as the reference card.
+    "Radeon HD 6850 Club-3D OC Edition": "1 Watts",
+}
 
 # Raw columns the project needs. The last six are only used while processing:
 # Dedicated to filter, ROPs for the "(xN)" factor, Texture_Rate to check the
@@ -78,8 +94,8 @@ MULTI_GPU_RULES = {
 PCIE_SLOT_POWER_W = 75
 
 # Memory types with fewer cards than this are pooled into "Other" so every
-# group is large enough for an ANOVA. Cards are counted only where max_power_w
-# is known, because those are the only cards an analysis of power can use.
+# group is large enough for an ANOVA. Only complete rows are counted, i.e. the
+# cards of the analysis dataset, so the in-scope file gets the same groups.
 MIN_GROUP_SIZE = 30
 OTHER = "Other"
 
@@ -88,6 +104,7 @@ IDENTIFIER = "identifier"
 RESPONSE = "response"
 DERIVED_RESPONSE = "derived_response"
 PREDICTOR = "predictor"
+AUXILIARY = "auxiliary"
 GROUPING = "grouping"
 TIME = "time"
 CLUSTER = "cluster"
@@ -99,6 +116,7 @@ TWO_GROUPS = "two-group comparison"
 ANOVA = "ANOVA"
 REGRESSION = "regression"
 VALIDATION = "out-of-sample validation"
+SENSITIVITY = "sensitivity analysis"
 DISCUSSION = "discussion"
 ALL = "all analyses"
 
@@ -149,12 +167,16 @@ COLUMNS = {
         column: (PREDICTOR, _uses(DESCRIPTIVE, REGRESSION, VALIDATION), meaning)
         for column, meaning in {
             "tmus": "Texture mapping units",
-            "core_speed_mhz": "Base core clock (MHz)",
             "memory_bandwidth_gb_s": "Memory bandwidth (GB/s)",
             "memory_mb": "Video memory (MB)",
             "process_nm": "Manufacturing process (nm)",
         }.items()
     },
+    "core_speed_mhz": (
+        AUXILIARY,
+        _uses(DESCRIPTIVE, SENSITIVITY),
+        "Base core clock (MHz); may be missing, not in the main model",
+    ),
 }
 
 
@@ -183,11 +205,19 @@ def clean_text(selected: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([selected[["gpu_id"]], text], axis=1)
 
 
+def invalid_max_power(selected: pd.DataFrame) -> pd.Series:
+    """Rows whose Max_Power is a known data-entry error (INVALID_MAX_POWER)."""
+    wrong_value = selected["Name"].map(INVALID_MAX_POWER)
+    return selected["Max_Power"].eq(wrong_value).fillna(False).astype("bool")
+
+
 def parse_columns(selected: pd.DataFrame) -> pd.DataFrame:
     """Step 4: convert units and types; repair TMUs and Memory_Bus.
 
     Where ROPs read "a (xN)", the source listed TMUs and Memory_Bus divided by
     N: Texture_Rate and Memory_Bandwidth only agree with them once multiplied.
+    A Max_Power listed in INVALID_MAX_POWER becomes missing: unlike the "(xN)"
+    error, the true value cannot be computed from the row's other columns.
     """
     num = parsers.parse_number
     release_date = parsers.parse_date(selected["Release_Date"])
@@ -201,7 +231,9 @@ def parse_columns(selected: pd.DataFrame) -> pd.DataFrame:
             "release_year": release_date.dt.year.astype("Int64"),
             "is_dedicated": parsers.parse_yes_no(selected["Dedicated"]),
             "is_notebook": parsers.parse_yes_no(selected["Notebook_GPU"]),
-            "max_power_w": num(selected["Max_Power"], "Watts"),
+            "max_power_w": num(
+                selected["Max_Power"].mask(invalid_max_power(selected)), "Watts"
+            ),
             "tmus": num(selected["TMUs"]) * multiplier,
             "spec_multiplier": multiplier,
             "core_speed_mhz": num(selected["Core_Speed"], "MHz"),
@@ -268,7 +300,14 @@ def match_multi_gpu_rules(names: pd.Series) -> pd.Series:
     return matches.apply(lambda row: ",".join(row.index[row]), axis=1)
 
 
-# Parsed columns every final column is built from; step 5 drops rows missing any.
+# Final columns that may be missing. The core clock is missing more often than
+# any other column, and across chips it moves together with the process and
+# the release year, so the main model leaves it out. It is kept to compare
+# cards built on the same chip.
+OPTIONAL_COLUMNS = ["core_speed_mhz"]
+
+# Parsed columns the required final columns are built from; step 5 drops rows
+# missing any of them.
 COMPLETE_COLUMNS = [
     "name",
     "manufacturer",
@@ -277,7 +316,6 @@ COMPLETE_COLUMNS = [
     "is_notebook",
     "max_power_w",
     "tmus",
-    "core_speed_mhz",
     "memory_bandwidth_gb_s",
     "memory_mb",
     "memory_type",
@@ -293,7 +331,7 @@ def filter_rows(
 
     Args:
         parsed: Output of :func:`parse_columns`.
-        drop_missing: Drop rows missing any value the final dataset needs.
+        drop_missing: Drop rows missing any required value (COMPLETE_COLUMNS).
             Set it to False to study the missing values themselves.
 
     Returns:
@@ -309,7 +347,9 @@ def filter_rows(
         ("not an exact duplicate", ~parsed.duplicated(subset=value_columns)),
     ]
     if drop_missing:
-        steps.append(("no missing value", parsed[COMPLETE_COLUMNS].notna().all(axis=1)))
+        steps.append(
+            ("no missing required value", parsed[COMPLETE_COLUMNS].notna().all(axis=1))
+        )
     keep = pd.Series(True, index=parsed.index)
     counts = []
     for step, condition in steps:
@@ -345,12 +385,12 @@ def derive_variables(rows: pd.DataFrame) -> pd.DataFrame:
         .astype("category"),
         needs_aux_power=rows["max_power_w"] > PCIE_SLOT_POWER_W,
         texture_rate_per_watt=rows["texture_rate_gtexel_s"] / rows["max_power_w"],
-        # Counted on cards with known power; after step 5 that is every row.
+        # Counted on complete rows; after step 5 that is every row.
         memory_type_group=pool_rare(
             rows["memory_type"],
             MIN_GROUP_SIZE,
             OTHER,
-            counted=rows["max_power_w"].notna(),
+            counted=rows[COMPLETE_COLUMNS].notna().all(axis=1),
         ),
     )
     return derived[list(COLUMNS)]
