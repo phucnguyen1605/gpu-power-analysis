@@ -62,7 +62,26 @@ def test_parsing_keeps_every_row_in_order(stages):
 @pytest.mark.parametrize(("raw_column", "column"), sorted(ONE_TO_ONE.items()))
 def test_no_value_lost_or_invented(stages, raw_column, column):
     raw_missing = stages["text"][raw_column].isin(MISSING_IN_RAW)
+    if raw_column == "Max_Power":
+        # The only values turned into missing ones are the documented errors.
+        raw_missing |= pre.invalid_max_power(stages["text"])
     assert (stages["parsed"][column].isna() == raw_missing).all()
+
+
+def test_known_wrong_power_is_set_to_missing(stages):
+    text, parsed = stages["text"], stages["parsed"]
+    invalid = pre.invalid_max_power(text)
+    assert text.loc[invalid, "Name"].tolist() == list(pre.INVALID_MAX_POWER)
+    assert parsed.loc[invalid, "max_power_w"].isna().all()
+    assert not stages["analysis"]["gpu_id"].isin(parsed.loc[invalid, "gpu_id"]).any()
+
+
+def test_only_listed_raw_value_is_invalidated():
+    name, wrong = next(iter(pre.INVALID_MAX_POWER.items()))
+    rows = pd.DataFrame(
+        {"Name": [name, name, "Other card"], "Max_Power": [wrong, "127 Watts", wrong]}
+    )
+    assert pre.invalid_max_power(rows).tolist() == [True, False, False]
 
 
 def test_tmus_repair_satisfies_texture_identity(stages):
@@ -84,8 +103,10 @@ def test_kept_rows_satisfy_every_filter(stages):
     assert kept[pre.COMPLETE_COLUMNS].notna().all().all()
 
 
-def test_final_dataset_has_no_missing_value(stages):
-    assert not stages["analysis"].isna().any().any()
+def test_only_optional_columns_have_missing_values(stages):
+    missing = stages["analysis"].isna().any()
+    assert missing[missing].index.tolist() == pre.OPTIONAL_COLUMNS
+    assert set(pre.OPTIONAL_COLUMNS).isdisjoint(pre.COMPLETE_COLUMNS)
 
 
 def test_drop_missing_can_be_skipped(stages):

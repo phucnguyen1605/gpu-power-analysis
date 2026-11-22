@@ -11,3 +11,6 @@ ANALYSIS_PARQUET = PROCESSED_DIR / "gpus_analysis.parquet"
 ANALYSIS_CSV = PROCESSED_DIR / "gpus_analysis.csv"
 ANALYSIS_DICTIONARY = PROCESSED_DIR / "gpus_analysis_dictionary.csv"
 ROW_COUNTS = PROCESSED_DIR / "row_counts.csv"
+# In-scope rows before incomplete ones are dropped (same columns, with NA).
+IN_SCOPE_PARQUET = PROCESSED_DIR / "gpus_in_scope.parquet"
+IN_SCOPE_CSV = PROCESSED_DIR / "gpus_in_scope.csv"
