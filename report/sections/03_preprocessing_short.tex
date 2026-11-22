@@ -279,22 +279,12 @@ năm 2006, và các dòng có công suất nhưng bị loại có công suất t
 \end{table}
 
 
-\textbf{Hệ quả} (Bảng~\ref{tab:power-groups}).
-\begin{itemize}
-  \item Công suất trung bình bị đẩy lên một chút (\PreFinalPowerMean{} so với
-    \PreAllPowerMean~W), nên các ước lượng trung bình và tỉ lệ ở mục sau chỉ đại diện cho
-    GPU rời có đủ thông số, chủ yếu phát hành từ 2006 đến \PreReleaseYearMax.
-  \item So sánh desktop với laptop ổn định (desktop gấp khoảng ba lần ở cả hai cách tính);
-    so sánh giữa các hãng thì nhạy: chênh lệch Nvidia trừ AMD đổi từ
-    $\PreNvidiaMinusAmdFinal$ thành $\PreNvidiaMinusAmdAll$~W, nên kết luận về hãng cần
-    kiểm tra trên cả hai tập.
-  \item Với hồi quy, loại dòng không làm lệch hệ số nếu việc khuyết chỉ phụ thuộc các biến
-    giải thích trong mô hình \cite{hughes2019}. Đây là một giả định; vì khuyết phụ thuộc
-    mạnh vào năm phát hành, mô hình nên được chạy thêm một lần có năm phát hành.
-  \item Bộ dữ liệu trước khi loại dòng khuyết (\PreRowsScoped{} dòng) được lưu thành
-    \texttt{gpus\_in\_scope} để các phân tích chỉ cần vài cột có thể chạy lại trên mọi
-    dòng đủ các cột đó (ghi rõ cỡ mẫu).
-\end{itemize}
+\textbf{Hệ quả.} Bộ dữ liệu cuối có công suất trung bình cao hơn một chút so với mọi card
+có ghi công suất (\PreFinalPowerMean{} so với \PreAllPowerMean~W, Bảng~\ref{tab:power-groups}),
+nên các kết luận ở mục sau chỉ đại diện cho GPU rời có đủ thông số, chủ yếu phát hành từ
+2006 đến \PreReleaseYearMax. Chênh lệch desktop--laptop ổn định trên cả hai tập (desktop
+gấp khoảng ba lần). Ngược lại, chênh lệch Nvidia trừ AMD đổi từ $\PreNvidiaMinusAmdFinal$
+thành $\PreNvidiaMinusAmdAll$~W, nên kết luận về hãng cần được kiểm tra trên cả hai tập.
 
 \begin{table}[htbp]
   \centering
