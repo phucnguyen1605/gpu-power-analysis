@@ -8,6 +8,8 @@ Input:
 
 Outputs:
     report/generated/anova_two_way_numbers.tex
+    report/generated/anova_cells_combined.tex
+    report/generated/anova_table_combined.tex
     report/generated/anova_cells_raw.tex
     report/generated/anova_cells_log.tex
     report/generated/anova_normality.tex
@@ -88,6 +90,75 @@ def fmt_decision(reject: Any) -> str:
     if pd.isna(reject):
         return "--"
     return r"Bác bỏ $H_0$" if bool(reject) else r"Chưa bác bỏ $H_0$"
+
+
+def build_combined_cell_rows(
+    raw_res: anova.TwoWayAnovaResult,
+    log_res: anova.TwoWayAnovaResult,
+) -> str:
+    """Build compact LaTeX rows combining raw/log cell summaries and Shapiro-Wilk."""
+    merged = (
+        raw_res.cell_summary.merge(
+            log_res.cell_summary,
+            on=["manufacturer", "segment", "count"],
+            suffixes=("_raw", "_log"),
+        )
+        .merge(
+            log_res.cell_normality[
+                ["manufacturer", "segment", "shapiro_w", "p_value"]
+            ].rename(columns={"shapiro_w": "w_log", "p_value": "p_log"}),
+            on=["manufacturer", "segment"],
+        )
+    )
+    lines: list[str] = []
+    for row in merged.itertuples():
+        geom_w = float(np.exp(row.mean_log))
+        cells = [
+            f"{row.manufacturer} -- {row.segment}",
+            str(int(row.count)),
+            f"{dec(row.mean_raw, 1)} $\\pm$ {dec(row.std_raw, 1)}",
+            dec(row.median_raw, 1),
+            f"{dec(row.mean_log, 2)} $\\pm$ {dec(row.std_log, 2)}",
+            dec(geom_w, 1),
+            f"{dec(row.w_log, 3)} ({fmt_p(row.p_log)})",
+        ]
+        lines.append(" & ".join(cells) + r" \\")
+    return "\n".join(lines) + "\n"
+
+
+def build_combined_anova_rows(
+    raw_res: anova.TwoWayAnovaResult,
+    log_res: anova.TwoWayAnovaResult,
+) -> str:
+    """Build a single two-panel LaTeX ANOVA table (raw scale and log scale)."""
+    panels = [
+        (r"Panel A: Thang gốc \texttt{max\_power\_w} (W)", raw_res, False),
+        (r"Panel B: Thang logarit \texttt{log\_max\_power\_w} ($\ln$W)", log_res, True),
+    ]
+    lines: list[str] = []
+    for idx, (title, res, is_log) in enumerate(panels):
+        if idx > 0:
+            lines.append(r"\midrule")
+        lines.append(rf"\multicolumn{{7}}{{@{{}}l@{{}}}}{{\textbf{{{title}}}}} \\")
+        ss_digits = 2 if is_log else 1
+        ms_digits = 3 if is_log else 1
+        for row in res.anova_table.itertuples():
+            if row.source == "Total":
+                continue
+            label = SOURCE_LABELS.get(row.source, str(row.source))
+            ss_str = dec_int_sep(row.ss, ss_digits)
+            df_str = str(int(row.df))
+            ms_str = "--" if pd.isna(row.ms) else dec_int_sep(row.ms, ms_digits)
+            f_str = "--" if pd.isna(row.f_stat) else dec(row.f_stat, 3)
+            p_str = "--" if pd.isna(row.p_value) else fmt_p(row.p_value)
+            eta_str = (
+                "--" if pd.isna(row.partial_eta_sq) else dec(row.partial_eta_sq, 4)
+            )
+            lines.append(
+                " & ".join([label, ss_str, df_str, ms_str, f_str, p_str, eta_str])
+                + r" \\"
+            )
+    return "\n".join(lines) + "\n"
 
 
 def build_cell_rows(result: anova.TwoWayAnovaResult, *, is_log: bool = False) -> str:
@@ -407,7 +478,7 @@ def generate_figures(
     segments = ["Desktop", "Laptop"]
 
     # Figure 1: Boxplots + interaction mean lines (raw vs log)
-    fig, axes = plt.subplots(1, 2, figsize=(9.2, 3.8), constrained_layout=True)
+    fig, axes = plt.subplots(1, 2, figsize=(9.2, 2.9), constrained_layout=True)
     panels = [
         (
             axes[0],
@@ -513,7 +584,7 @@ def generate_figures(
     plt.close(fig)
 
     # Figure 3: Tukey HSD 95% simultaneous confidence intervals (log scale)
-    fig, ax = plt.subplots(figsize=(7.6, 3.3), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(7.6, 2.5), constrained_layout=True)
     tukey = log_res.tukey_table.iloc[::-1].reset_index(drop=True)
     y_pos = np.arange(len(tukey))
     for idx, row in enumerate(tukey.itertuples()):
@@ -584,6 +655,8 @@ def main() -> None:
     )
 
     table_outputs = {
+        "anova_cells_combined.tex": build_combined_cell_rows(raw_res, log_res),
+        "anova_table_combined.tex": build_combined_anova_rows(raw_res, log_res),
         "anova_cells_raw.tex": build_cell_rows(raw_res, is_log=False),
         "anova_cells_log.tex": build_cell_rows(log_res, is_log=True),
         "anova_normality.tex": build_normality_rows(raw_res, log_res),
