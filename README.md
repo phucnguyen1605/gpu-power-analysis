@@ -21,6 +21,8 @@ pip install -e . --no-deps           # để import được package gpu_power_a
 ```bash
 python scripts/01_preprocess.py                  # tiền xử lý: dữ liệu thô -> dữ liệu cho đề tài
 python scripts/reports/report_preprocessing.py   # số liệu cho mục tiền xử lý của báo cáo (LaTeX)
+python scripts/reports/report_anova.py           # số liệu, bảng, hình cho mục 5.1 ANOVA
+(cd report && tectonic preview_section5_anova.tex)  # xem trước mục 5.1
 (cd report && tectonic preview_section3.tex)     # xem trước mục 3 (cần cài Tectonic)
 pytest                                           # chạy test
 ruff format . && ruff check .                    # format và kiểm tra code trước khi commit

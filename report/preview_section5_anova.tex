@@ -1,0 +1,50 @@
+% Xem trước riêng Mục 5.1 (ANOVA) khi chưa ghép vào báo cáo chính.
+% Biên dịch từ thư mục report/:
+%   python ../scripts/reports/report_anova.py   (nếu dữ liệu thay đổi)
+%   tectonic preview_section5_anova.tex
+\documentclass[12pt,a4paper]{article}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{fontspec}
+\setmainfont{texgyretermes}[Extension=.otf,UprightFont=*-regular,
+  BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
+\setmonofont{DejaVuSansMono}[Extension=.ttf,Scale=0.85,BoldFont=*-Bold]
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,array}
+\usepackage{caption}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\lstlistingname}{Đoạn code}
+\renewcommand{\refname}{Tài liệu tham khảo}
+\counterwithin{table}{section}
+\counterwithin{figure}{section}
+\AtBeginDocument{\counterwithin{lstlisting}{section}}
+% Đánh số đề mục nhỏ kiểu 5.1.2.a như mẫu báo cáo của nhóm.
+\setcounter{secnumdepth}{4}
+\renewcommand{\theparagraph}{\thesubsubsection.\alph{paragraph}}
+\lstset{basicstyle=\small\ttfamily, keywordstyle=\color{blue},
+  stringstyle=\color{violet}, frame=tb, breaklines=true,
+  showstringspaces=false, columns=flexible}
+
+\input{generated/anova_numbers.tex}
+
+\frenchspacing
+\begin{document}
+\setcounter{section}{4}
+\section{Thống kê suy diễn}
+\input{sections/05_1_anova.tex}
+
+% Mục 5.1 trích dẫn hai tài liệu này; file chính cần có cùng khóa.
+\begin{thebibliography}{9}
+  \bibitem{lumley2002} T.~Lumley, P.~Diehr, S.~Emerson, and L.~Chen, ``The importance of
+    the normality assumption in large public health data sets,'' \emph{Annu. Rev. Public
+    Health}, vol.~23, pp.~151--169, 2002, doi: 10.1146/annurev.publhealth.23.100901.140546.
+  \bibitem{delacre2019} M.~Delacre, C.~Leys, Y.~L. Mora, and D.~Lakens, ``Taking parametric
+    assumptions seriously: Arguments for the use of Welch's $F$-test instead of the classical
+    $F$-test in one-way ANOVA,'' \emph{Int. Rev. Soc. Psychol.}, vol.~32, no.~1, p.~13, 2019,
+    doi: 10.5334/irsp.198.
+\end{thebibliography}
+\end{document}
