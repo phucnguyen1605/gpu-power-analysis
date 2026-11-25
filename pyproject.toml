@@ -12,6 +12,8 @@ dependencies = [
     "pandas>=3.0",
     "pyarrow>=18",  # Parquet keeps column dtypes between pipeline steps
     "scipy>=1.14",  # hypothesis tests
+    "statsmodels>=0.14",  # Welch ANOVA (anova_oneway)
+    "matplotlib>=3.9",  # report figures
 ]
 
 [project.optional-dependencies]

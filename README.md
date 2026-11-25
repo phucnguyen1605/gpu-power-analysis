@@ -23,10 +23,12 @@ python scripts/01_preprocess.py                  # tiền xử lý: dữ liệu 
 python scripts/02_anova_two_way.py               # chạy ANOVA 2 chiều trên dữ liệu đã làm sạch
 python scripts/reports/report_overview.py        # số liệu cho mục tổng quan dữ liệu (LaTeX)
 python scripts/reports/report_preprocessing.py   # số liệu cho mục tiền xử lý của báo cáo (LaTeX)
+python scripts/reports/report_anova.py           # số liệu, bảng, hình cho mục 5.1 ANOVA
 python scripts/reports/report_anova_two_way.py   # số liệu, bảng và hình cho mục ANOVA 2 chiều (LaTeX)
 (cd report && tectonic preview_section1.tex)     # xem trước mục 1 (cần cài Tectonic)
 (cd report && tectonic preview_section3.tex)     # xem trước mục 3 (cần cài Tectonic)
-(cd report && tectonic preview_anova_two_way.tex) # xem trước mục ANOVA 2 chiều
+(cd report && tectonic preview_section5_anova.tex) # xem trước mục 5.1 ANOVA 1 chiều
+(cd report && tectonic preview_anova_two_way.tex)  # xem trước mục ANOVA 2 chiều
 pytest                                           # chạy test
 ruff format . && ruff check .                    # format và kiểm tra code trước khi commit
 ```
