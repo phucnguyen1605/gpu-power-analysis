@@ -257,10 +257,12 @@ def test_conclude_two_way_anova_reports_decisions():
     raw_res = anova.run_two_way_anova(raw_sample, raw_col, "manufacturer", "segment")
     lines = anova.conclude_two_way_anova(raw_res, hyp)
 
-    assert len(lines) == 7
+    assert len(lines) == 8
     text = "\n".join(lines)
     assert "Fail to reject H0 (H0ab)" in text
     assert "Fail to reject H0 (H0a)" in text
     assert "Reject H0 (H0b)" in text
     assert "Fisher's LSD" in text
     assert "Variance heterogeneity is substantial" in text
+    assert "Overall answer to research question" in text
+    assert "segment affects response = Yes" in text

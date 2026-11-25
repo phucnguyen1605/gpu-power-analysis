@@ -652,4 +652,27 @@ def conclude_two_way_anova(
         for r in result.simple_effects.itertuples()
     )
     lines.append(f"Simple effects (Welch t-tests): {simple_summary}.")
+
+    reject_map = dict(
+        zip(
+            result.anova_table["source"],
+            result.anova_table["reject_h0"],
+            strict=True,
+        )
+    )
+    rej_a = bool(reject_map[result.factor_a])
+    rej_b = bool(reject_map[result.factor_b])
+    rej_ab = bool(reject_map[interaction_src])
+
+    def _verdict(rejected: bool, h0_code: str) -> str:
+        if rejected:
+            return f"Yes (reject {h0_code})"
+        return f"No (fail to reject {h0_code})"
+
+    lines.append(
+        f"Overall answer to research question (alpha = {alpha:g}): "
+        f"{result.factor_a} affects response = {_verdict(rej_a, 'H0a')}; "
+        f"{result.factor_b} affects response = {_verdict(rej_b, 'H0b')}; "
+        f"interaction exists = {_verdict(rej_ab, 'H0ab')}."
+    )
     return lines
