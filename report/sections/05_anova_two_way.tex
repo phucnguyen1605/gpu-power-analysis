@@ -93,9 +93,9 @@ trên Desktop, còn trên Laptop Nvidia cao hơn AMD \AnovaRawLaptopGapW{}~W (TB
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.86\linewidth]{figures/anova_interaction.pdf}
-  \caption{Biểu đồ hộp và đường tương tác trung bình (KTC 95\%) trên thang gốc (trái) và
-    thang logarit (phải)}
+  \includegraphics[width=0.80\linewidth]{figures/anova_interaction.pdf}
+  \caption{Biểu đồ hộp và đường tương tác trung bình (khoảng tin cậy 95\%) trên thang gốc
+    (trái) và thang logarit (phải)}
   \label{fig:anova_interaction}
 \end{figure}
 
@@ -106,16 +106,18 @@ hai đường trung bình không song song (khoảng cách ở Laptop rộng hơ
 
 \subsection{Kiểm tra giả định và kết quả ANOVA hai chiều}
 
-{\sloppy \textbf{Kiểm tra ba giả định ANOVA.} \textbf{(1) Tính chuẩn:} trên thang gốc,
-Shapiro--Wilk bác bỏ ở bốn ô và phần dư ($W = \AnovaRawShapiroW$, $p$~\AnovaRawShapiroP);
-trên thang log, ô AMD -- Laptop thỏa chuẩn ($p$~\AnovaLogAmdLapShapiroP), còn phần dư lệch
-nhẹ do $n$ lớn ($W = \AnovaLogShapiroW$, $p$~\AnovaLogShapiroP) nhưng $n_{ij} \ge
-\AnovaCellAmdLaptopN$ bảo đảm kiểm định $F$ bền vững. \textbf{(2) Đồng nhất phương sai:}
-Levene thang gốc bác bỏ mạnh ($W = \AnovaRawLeveneW$, $p$~\AnovaRawLeveneP, tỉ số SD $=
-\AnovaRawSdRatio$); thang log đưa tỉ số SD còn \textbf{\AnovaLogSdRatio{}} ($< 2{,}0$) và
-giảm $W$ xuống $\AnovaLogLeveneW$ ($p$~\AnovaLogLeveneP). \textbf{(3) Tính độc lập:} các
-bản ghi ứng với mẫu GPU độc lập, song một số card dùng chung kiến trúc nên kết quả được
-kiểm chứng thêm bằng Welch $t$-test.\par}
+{\sloppy \textbf{Kiểm tra ba giả định ANOVA.}\\
+\textbf{(1) Tính chuẩn:} trên thang gốc, Shapiro--Wilk bác bỏ ở bốn ô và phần dư
+($W = \AnovaRawShapiroW$, $p$~\AnovaRawShapiroP); trên thang log, ô AMD -- Laptop thỏa
+chuẩn ($p$~\AnovaLogAmdLapShapiroP), còn phần dư lệch nhẹ do $n$ lớn
+($W = \AnovaLogShapiroW$, $p$~\AnovaLogShapiroP) nhưng $n_{ij} \ge
+\AnovaCellAmdLaptopN$ bảo đảm kiểm định $F$ bền vững.\\
+\textbf{(2) Đồng nhất phương sai:} Levene thang gốc bác bỏ mạnh
+($W = \AnovaRawLeveneW$, $p$~\AnovaRawLeveneP, tỉ số SD $= \AnovaRawSdRatio$); thang log
+đưa tỉ số SD còn \textbf{\AnovaLogSdRatio{}} ($< 2{,}0$) và giảm $W$ xuống
+$\AnovaLogLeveneW$ ($p$~\AnovaLogLeveneP).\\
+\textbf{(3) Tính độc lập:} các bản ghi ứng với mẫu GPU độc lập, song một số card dùng
+chung kiến trúc nên kết quả được kiểm chứng thêm bằng Welch $t$-test.\par}
 
 \begin{table}[H]
   \centering
@@ -138,14 +140,14 @@ kiểm chứng thêm bằng Welch $t$-test.\par}
 
 \textbf{Nhận xét Bảng~\ref{tab:anova_table}.} Trên \textbf{thang gốc} (Panel A), chỉ
 phân khúc có ý nghĩa ($F_b = \AnovaRawFSeg > \AnovaFCrit$, $p$~\AnovaRawPSeg, $\eta_p^2 =
-\AnovaRawEtaSeg$, bác bỏ $H_{0b}$); hãng ($F_a = \AnovaRawFMaker \le \AnovaFCrit$,
-$p$~\AnovaRawPMaker) và tương tác ($F_{ab} = \AnovaRawFInter \le \AnovaFCrit$,
-$p$~\AnovaRawPInter) chưa bác bỏ được $H_{0a}, H_{0ab}$ do $\mathrm{MSE} = \AnovaRawMsErr$
-lớn ở Desktop. Trên \textbf{thang logarit} (Panel B, $\mathrm{MSE} = \AnovaLogMsErr$), cả ba
-thống kê đều vượt $\AnovaFCrit$ (bác bỏ $H_{0a}, H_{0b}, H_{0ab}$): phân khúc chi phối mạnh
-nhất ($F_b = \AnovaLogFSeg$, \AnovaLogEtaSegPct{}\% phương sai cục bộ, $p$~\AnovaLogPSeg),
-cùng hãng ($F_a = \AnovaLogFMaker$, $p$~\AnovaLogPMaker) và \textbf{tương tác có ý nghĩa}
-($F_{ab} = \AnovaLogFInter$, $p$~\AnovaLogPInter).
+\AnovaRawEtaSeg$, bác bỏ $H_{0b}$); hãng ($F_a = \AnovaRawFMaker$, $p$~\AnovaRawPMaker) và
+tương tác ($F_{ab} = \AnovaRawFInter$, $p$~\AnovaRawPInter) chưa bác bỏ được
+$H_{0a}, H_{0ab}$ do $\mathrm{MSE} = \AnovaRawMsErr$ lớn ở Desktop. Trên \textbf{thang
+logarit} (Panel B, $\mathrm{MSE} = \AnovaLogMsErr$), cả ba kiểm định đều vượt $\AnovaFCrit$
+(bác bỏ $H_{0a}, H_{0b}, H_{0ab}$): phân khúc mạnh nhất ($F_b = \AnovaLogFSeg$,
+\AnovaLogEtaSegPct{}\%, $p$~\AnovaLogPSeg), cùng hãng ($F_a = \AnovaLogFMaker$,
+$p$~\AnovaLogPMaker) và \textbf{tương tác} ($F_{ab} = \AnovaLogFInter$,
+$p$~\AnovaLogPInter).
 
 \subsection{Hậu kiểm, kiểm chứng hiệu ứng đơn và kết luận}
 
@@ -159,15 +161,15 @@ họ, Hình~\ref{fig:anova_tukey_ci} kiểm chứng thêm bằng \textbf{Tukey H
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.68\linewidth]{figures/anova_tukey_ci.pdf}
+  \includegraphics[width=0.62\linewidth]{figures/anova_tukey_ci.pdf}
   \caption{Khoảng tin cậy 95\% đồng thời của hậu kiểm Tukey HSD trên thang logarit}
   \label{fig:anova_tukey_ci}
 \end{figure}
 
-\textbf{Nhận xét Hình~\ref{fig:anova_tukey_ci}.} Theo Tukey HSD, 5/6 cặp có KTC 95\% đồng
-thời không chứa 0 ($p < 0{,}001$); riêng cặp AMD -- Desktop vs Nvidia -- Desktop cắt qua 0
-($p$~\AnovaLogTukeyDeskP), còn trên Laptop Nvidia vượt AMD rõ rệt ($p$~\AnovaLogTukeyLapP),
-khẳng định bản chất hiệu ứng tương tác.
+\textbf{Nhận xét Hình~\ref{fig:anova_tukey_ci}.} Theo Tukey HSD, 5/6 cặp có khoảng tin
+cậy 95\% đồng thời không chứa 0 ($p < 0{,}001$); cặp AMD -- Desktop vs Nvidia -- Desktop
+cắt qua 0 ($p$~\AnovaLogTukeyDeskP), còn trên Laptop Nvidia vượt AMD rõ rệt
+($p$~\AnovaLogTukeyLapP), khẳng định tương tác.
 
 \begin{table}[H]
   \centering
@@ -196,13 +198,16 @@ $p$~\AnovaLogWelchLaptopP); trong Desktop, hai hãng tương đương ở thang 
 Tukey HSD không có ý nghĩa).
 
 \textbf{Kết luận trả lời câu hỏi kiểm định ($\alpha = \AnovaAlpha$).} \textbf{Có} ---
-trên thang logarit (đã ổn định phương sai), bác bỏ cả ba giả thuyết $H_{0a}, H_{0b},
-H_{0ab}$: cả \textbf{hãng sản xuất} ($p$~\AnovaLogPMaker), \textbf{phân khúc}
-($p$~\AnovaLogPSeg) và \textbf{tương tác} ($p$~\AnovaLogPInter) đều ảnh hưởng có ý nghĩa
-tới công suất GPU rời (thang gốc chỉ bác bỏ $H_{0b}$ do phương sai Desktop lớn). Cụ thể:
-(1)~\textbf{phân khúc} chi phối mạnh nhất (\AnovaRawEtaSegPct{}\%--\AnovaLogEtaSegPct{}\%
-phương sai cục bộ); (2)~\textbf{tương tác theo tỉ lệ} thể hiện qua Desktop hai hãng tương
-đương (\AnovaGeomNvidiaDesktop{}~W vs \AnovaGeomAmdDesktop{}~W) còn Laptop Nvidia vượt
-AMD \AnovaLaptopGeomGapPct{}\% (\AnovaGeomNvidiaLaptop{}~W vs \AnovaGeomAmdLaptop{}~W);
-(3)~\emph{hạn chế:} biến thiên Desktop còn lớn nên cần thêm biến phần cứng khi hồi quy,
-và dù có chung kiến trúc (\texttt{architecture}), kết luận vẫn vững qua Welch $t$-test.
+trên thang logarit (đã ổn định phương sai), bác bỏ cả $H_{0a}, H_{0b}, H_{0ab}$:
+\textbf{hãng} ($p$~\AnovaLogPMaker), \textbf{phân khúc} ($p$~\AnovaLogPSeg) và
+\textbf{tương tác} ($p$~\AnovaLogPInter) đều ảnh hưởng có ý nghĩa đến công suất GPU rời
+(thang gốc chỉ bác bỏ $H_{0b}$ do phương sai Desktop lớn).\\
+\textbf{(1) Nhân tố chủ đạo:} phân khúc chi phối mạnh nhất
+(\AnovaRawEtaSegPct{}\%--\AnovaLogEtaSegPct{}\% phương sai cục bộ).\\
+\textbf{(2) Tương tác theo tỉ lệ:} trên Desktop hai hãng tương đương
+(\AnovaGeomNvidiaDesktop{}~W vs \AnovaGeomAmdDesktop{}~W), còn trên Laptop Nvidia vượt
+AMD \AnovaLaptopGeomGapPct{}\% (\AnovaGeomNvidiaLaptop{}~W vs
+\AnovaGeomAmdLaptop{}~W).\\
+\textbf{(3) Hạn chế:} biến thiên Desktop còn lớn nên cần thêm biến phần cứng khi hồi
+quy; dù có chung kiến trúc (\texttt{architecture}), kết luận vẫn vững qua Welch
+$t$-test.

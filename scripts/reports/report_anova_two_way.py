@@ -642,7 +642,9 @@ def generate_figures(
     ]
     ax.set_yticks(y_pos)
     ax.set_yticklabels(labels)
-    ax.set_xlabel("Chênh lệch trung bình ln(Công suất) và KTC 95% đồng thời")
+    ax.set_xlabel(
+        "Chênh lệch trung bình ln(Công suất) và khoảng tin cậy 95% đồng thời"
+    )
     ax.set_title(r"Hậu kiểm Tukey HSD trên thang logarit ($\alpha$ = 0,05)")
     ax.grid(axis="x", linestyle=":", alpha=0.5)
     fig.savefig(FIGURES / "anova_tukey_ci.pdf", bbox_inches="tight")
