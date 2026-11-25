@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+from scipy import stats
 
 from gpu_power_analysis import anova, preprocess
 
@@ -96,6 +97,8 @@ def test_real_gpu_unbalanced_type_iii_matches_harmonic_mean_formula():
 
     assert raw_res.n_obs == 1980
     assert len(raw_res.tukey_table) == 6
+    assert len(raw_res.lsd_table) == 6
+    assert int(raw_res.lsd_table["reject_h0"].sum()) == 4
     cell_counts = {
         (row.manufacturer, row.segment): int(row.count)
         for row in raw_res.cell_summary.itertuples()
@@ -144,6 +147,41 @@ def test_real_gpu_unbalanced_type_iii_matches_harmonic_mean_formula():
     assert bool(log_tbl.at["segment", "reject_h0"]) is True
     assert bool(log_tbl.at["manufacturer:segment", "reject_h0"]) is True
     assert log_res.sd_ratio < raw_res.sd_ratio
+    assert len(log_res.lsd_table) == 6
+    assert int(log_res.lsd_table["reject_h0"].sum()) == 6
+
+
+def test_fisher_lsd_matches_unequal_n_slide_formula():
+    cleaned = preprocess.load_analysis()
+    for log_transform in (False, True):
+        sample, col = anova.prepare_two_way_sample(
+            cleaned,
+            "max_power_w",
+            "manufacturer",
+            "segment",
+            include_a=("Nvidia", "AMD"),
+            log_transform=log_transform,
+        )
+        res = anova.run_two_way_anova(
+            sample, col, "manufacturer", "segment", alpha=0.05, ss_type="III"
+        )
+        residual_row = res.anova_table.loc[
+            res.anova_table["source"] == "Residual"
+        ].iloc[0]
+        df_err = int(residual_row["df"])
+        mse = float(residual_row["ms"])
+        expected_t_crit = float(stats.t.ppf(0.975, df_err))
+        counts = {
+            f"{row.manufacturer}-{row.segment}": int(row.count)
+            for row in res.cell_summary.itertuples()
+        }
+        for row in res.lsd_table.itertuples():
+            n1 = counts[row.group_1]
+            n2 = counts[row.group_2]
+            expected_lsd = expected_t_crit * float(np.sqrt(mse * (1.0 / n1 + 1.0 / n2)))
+            assert row.t_crit == pytest.approx(expected_t_crit, rel=1e-12)
+            assert row.lsd_crit == pytest.approx(expected_lsd, rel=1e-12)
+            assert bool(row.reject_h0) is bool(row.abs_diff > row.lsd_crit)
 
 
 def test_prepare_and_run_validation_errors():
@@ -219,9 +257,10 @@ def test_conclude_two_way_anova_reports_decisions():
     raw_res = anova.run_two_way_anova(raw_sample, raw_col, "manufacturer", "segment")
     lines = anova.conclude_two_way_anova(raw_res, hyp)
 
-    assert len(lines) == 6
+    assert len(lines) == 7
     text = "\n".join(lines)
-    assert "Fail to reject H0 (H0AB)" in text
-    assert "Fail to reject H0 (H0A)" in text
-    assert "Reject H0 (H0B)" in text
+    assert "Fail to reject H0 (H0ab)" in text
+    assert "Fail to reject H0 (H0a)" in text
+    assert "Reject H0 (H0b)" in text
+    assert "Fisher's LSD" in text
     assert "Variance heterogeneity is substantial" in text

@@ -62,6 +62,10 @@ def _log_result(
 
     logger.info("ANOVA table:\n%s", result.anova_table.to_string(index=False))
     logger.info(
+        "Fisher's LSD pairwise comparisons:\n%s",
+        result.lsd_table.to_string(index=False),
+    )
+    logger.info(
         "Tukey HSD pairwise comparisons:\n%s", result.tukey_table.to_string(index=False)
     )
     logger.info(

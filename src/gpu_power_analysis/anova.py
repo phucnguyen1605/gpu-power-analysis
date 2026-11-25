@@ -1,8 +1,8 @@
 """Two-way factorial ANOVA for GPU power analysis.
 
 Provides hypothesis definitions, cleaned-sample validation, Type II/III
-unbalanced two-way ANOVA with assumption checks, Tukey HSD post-hoc tests,
-simple-effects Welch t-tests, and dynamic statistical conclusions.
+unbalanced two-way ANOVA with assumption checks, Fisher's LSD and Tukey HSD
+post-hoc tests, simple-effects Welch t-tests, and dynamic conclusions.
 """
 
 from collections.abc import Sequence
@@ -52,6 +52,7 @@ class TwoWayAnovaResult:
     shapiro_residuals_p: float
     cell_normality: pd.DataFrame
     tukey_table: pd.DataFrame
+    lsd_table: pd.DataFrame
     simple_effects: pd.DataFrame
     residuals: pd.Series
 
@@ -71,28 +72,26 @@ def build_gpu_power_hypotheses(
             f"on segment (interaction effect)?"
         ),
         null_a=(
-            f"H0A: Mean {response_label} does not differ between Nvidia and AMD "
-            f"(mu_Nvidia = mu_AMD)."
+            f"H0a: tau_1 = ... = tau_a = 0 (no main effect of manufacturer: "
+            f"Nvidia vs AMD on {response_label})."
         ),
         alt_a=(
-            f"H1A: Mean {response_label} differs between Nvidia and AMD "
-            f"(mu_Nvidia != mu_AMD)."
+            f"H1a: At least one tau_i != 0 (manufacturer affects {response_label})."
         ),
         null_b=(
-            f"H0B: Mean {response_label} does not differ between Desktop and Laptop "
-            f"(mu_Desktop = mu_Laptop)."
+            f"H0b: beta_1 = ... = beta_b = 0 (no main effect of segment: "
+            f"Desktop vs Laptop on {response_label})."
         ),
         alt_b=(
-            f"H1B: Mean {response_label} differs between Desktop and Laptop "
-            f"(mu_Desktop != mu_Laptop)."
+            f"H1b: At least one beta_j != 0 (segment affects {response_label})."
         ),
         null_ab=(
-            f"H0AB: There is no interaction between manufacturer and segment on "
-            f"{response_label}."
+            f"H0ab: (tau*beta)_ij = 0 for all i, j (no interaction between "
+            f"manufacturer and segment on {response_label})."
         ),
         alt_ab=(
-            f"H1AB: There is an interaction between manufacturer and segment on "
-            f"{response_label}."
+            f"H1ab: At least one (tau*beta)_ij != 0 (interaction exists between "
+            f"manufacturer and segment on {response_label})."
         ),
         alpha=alpha,
     )
@@ -393,6 +392,40 @@ def _compute_tukey_table(
     return pd.DataFrame(rows)
 
 
+def _compute_lsd_table(
+    cell_labels: Sequence[str],
+    cell_arrays: Sequence[np.ndarray],
+    mse: float,
+    df_err: int,
+    alpha: float,
+) -> pd.DataFrame:
+    """Run Fisher's LSD pairwise comparisons for unequal cell sizes."""
+    t_crit = float(stats.t.ppf(1.0 - alpha / 2.0, df_err))
+    rows: list[dict[str, Any]] = []
+    for i, j in combinations(range(len(cell_labels)), 2):
+        arr_i = cell_arrays[i]
+        arr_j = cell_arrays[j]
+        diff = float(np.mean(arr_i) - np.mean(arr_j))
+        abs_diff = abs(diff)
+        se = float(np.sqrt(mse * (1.0 / len(arr_i) + 1.0 / len(arr_j))))
+        lsd_crit = t_crit * se
+        t_stat = abs_diff / se if se > 0 else (0.0 if abs_diff == 0.0 else np.inf)
+        p_val = float(2.0 * stats.t.sf(t_stat, df_err)) if np.isfinite(t_stat) else 0.0
+        rows.append(
+            {
+                "group_1": cell_labels[i],
+                "group_2": cell_labels[j],
+                "diff": diff,
+                "abs_diff": abs_diff,
+                "lsd_crit": lsd_crit,
+                "t_crit": t_crit,
+                "p_value": p_val,
+                "reject_h0": bool(abs_diff > lsd_crit),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def _compute_simple_effects(
     data: pd.DataFrame,
     response: str,
@@ -485,7 +518,12 @@ def run_two_way_anova(
     else:
         sh_stat_f, sh_p_f = np.nan, np.nan
 
+    residual_row = anova_table.loc[anova_table["source"] == "Residual"].iloc[0]
+    df_err = int(residual_row["df"])
+    mse = float(residual_row["ms"])
+
     tukey_table = _compute_tukey_table(cell_labels, cell_arrays, alpha)
+    lsd_table = _compute_lsd_table(cell_labels, cell_arrays, mse, df_err, alpha)
     simple_effects = _compute_simple_effects(
         data, response, factor_a, factor_b, levels_a, levels_b, alpha
     )
@@ -506,6 +544,7 @@ def run_two_way_anova(
         shapiro_residuals_p=sh_p_f,
         cell_normality=cell_normality,
         tukey_table=tukey_table,
+        lsd_table=lsd_table,
         simple_effects=simple_effects,
         residuals=pd.Series(residuals, index=data.index, name="residuals"),
     )
@@ -554,23 +593,41 @@ def conclude_two_way_anova(
 
     interaction_src = f"{result.factor_a}:{result.factor_b}"
     term_labels = [
-        (interaction_src, "Interaction", hypothesis.null_ab if hypothesis else "H0AB"),
-        (result.factor_a, "Factor A", hypothesis.null_a if hypothesis else "H0A"),
-        (result.factor_b, "Factor B", hypothesis.null_b if hypothesis else "H0B"),
+        (interaction_src, "Interaction", hypothesis.null_ab if hypothesis else "H0ab"),
+        (result.factor_a, "Factor A", hypothesis.null_a if hypothesis else "H0a"),
+        (result.factor_b, "Factor B", hypothesis.null_b if hypothesis else "H0b"),
     ]
     for source, role, h0_desc in term_labels:
         row = result.anova_table.loc[result.anova_table["source"] == source].iloc[0]
+        rejected = bool(row["reject_h0"])
+        h0_code = h0_desc.split(":")[0]
         decision = (
-            f"Reject H0 ({h0_desc.split(':')[0]})"
-            if bool(row["reject_h0"])
-            else f"Fail to reject H0 ({h0_desc.split(':')[0]})"
+            f"Reject H0 ({h0_code})" if rejected else f"Fail to reject H0 ({h0_code})"
         )
+        crit_rel = ">" if rejected else "<="
         lines.append(
             f"{role} ({source}, Type {result.ss_type}): {decision} at alpha = "
             f"{alpha:g} -- F({int(row['df'])}, {df_err}) = {row['f_stat']:.3f} "
-            f"(F_crit = {row['f_crit']:.3f}), p {_format_p(float(row['p_value']))}, "
+            f"{crit_rel} f_crit = {row['f_crit']:.3f}, "
+            f"p {_format_p(float(row['p_value']))}, "
             f"partial eta^2 = {row['partial_eta_sq']:.4f}."
         )
+
+    sig_lsd = result.lsd_table[result.lsd_table["reject_h0"]]
+    nonsig_lsd = result.lsd_table[~result.lsd_table["reject_h0"]]
+    lsd_sig_pairs = ", ".join(
+        f"{r.group_1} vs {r.group_2} (|diff|={r.abs_diff:.3f} > LSD={r.lsd_crit:.3f})"
+        for r in sig_lsd.itertuples()
+    )
+    lsd_nonsig_pairs = ", ".join(
+        f"{r.group_1} vs {r.group_2} (|diff|={r.abs_diff:.3f} <= LSD={r.lsd_crit:.3f})"
+        for r in nonsig_lsd.itertuples()
+    )
+    lines.append(
+        f"Fisher's LSD ({len(sig_lsd)}/{len(result.lsd_table)} pairs significant): "
+        f"significant = [{lsd_sig_pairs or 'none'}]; "
+        f"non-significant = [{lsd_nonsig_pairs or 'none'}]."
+    )
 
     sig_tukey = result.tukey_table[result.tukey_table["reject_h0"]]
     nonsig_tukey = result.tukey_table[~result.tukey_table["reject_h0"]]

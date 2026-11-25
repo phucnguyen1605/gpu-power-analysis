@@ -17,6 +17,7 @@ Outputs:
     report/generated/anova_table_log.tex
     report/generated/anova_tukey_raw.tex
     report/generated/anova_tukey_log.tex
+    report/generated/anova_lsd_log.tex
     report/generated/anova_simple_effects.tex
     report/figures/anova_interaction.pdf
     report/figures/anova_qq.pdf
@@ -45,11 +46,11 @@ FACTORS = ("manufacturer", "segment")
 INCLUDED_MANUFACTURERS = ("Nvidia", "AMD")
 
 SOURCE_LABELS = {
-    "manufacturer": r"Hãng (\texttt{manufacturer})",
-    "segment": r"Phân khúc (\texttt{segment})",
-    "manufacturer:segment": r"Tương tác (Hãng $\times$ Phân khúc)",
-    "Residual": "Sai số (Residual)",
-    "Total": "Tổng cộng (Total)",
+    "manufacturer": r"Giữa các nhóm -- Hãng ($SSG$)",
+    "segment": r"Giữa các khối -- Phân khúc ($SSB$)",
+    "manufacturer:segment": r"Tương tác Hãng $\times$ Phân khúc ($SSI$)",
+    "Residual": r"Sai số ($SSE$)",
+    "Total": r"Tổng cộng ($SST$)",
 }
 
 
@@ -143,8 +144,6 @@ def build_combined_anova_rows(
         ss_digits = 2 if is_log else 1
         ms_digits = 3 if is_log else 1
         for row in res.anova_table.itertuples():
-            if row.source == "Total":
-                continue
             label = SOURCE_LABELS.get(row.source, str(row.source))
             ss_str = dec_int_sep(row.ss, ss_digits)
             df_str = str(int(row.df))
@@ -259,6 +258,25 @@ def build_tukey_rows(result: anova.TwoWayAnovaResult, *, digits: int = 2) -> str
     return "\n".join(lines) + "\n"
 
 
+def build_lsd_rows(result: anova.TwoWayAnovaResult, *, digits: int = 3) -> str:
+    """Build LaTeX rows for Fisher's LSD pairwise comparisons."""
+    lines: list[str] = []
+    for row in result.lsd_table.itertuples():
+        g1 = row.group_1.replace("-", " -- ")
+        g2 = row.group_2.replace("-", " -- ")
+        sig_str = r"Bác bỏ $H_0$" if row.reject_h0 else r"Chưa bác bỏ $H_0$"
+        cells = [
+            f"{g1} vs {g2}",
+            signed_dec(row.diff, digits),
+            dec(row.abs_diff, digits),
+            dec(row.lsd_crit, digits),
+            fmt_p(row.p_value),
+            sig_str,
+        ]
+        lines.append(" & ".join(cells) + r" \\")
+    return "\n".join(lines) + "\n"
+
+
 def build_simple_effects_rows(
     raw_res: anova.TwoWayAnovaResult,
     log_res: anova.TwoWayAnovaResult,
@@ -327,6 +345,7 @@ def collect_macros(
     )
     desk_lap_diffs = raw_res.tukey_table.loc[raw_res.tukey_table["reject_h0"], "diff"]
     log_norm = log_res.cell_normality.set_index(["manufacturer", "segment"])
+    log_lsd_idx = log_res.lsd_table.set_index(["group_1", "group_2"])
 
     return {
         "Alpha": dec(ALPHA, 2),
@@ -336,6 +355,7 @@ def collect_macros(
         "SampleN": raw_res.n_obs,
         "DfErr": df_err,
         "FCrit": dec(float(raw_tbl.at["segment", "f_crit"]), 3),
+        "TCrit": dec(float(raw_res.lsd_table["t_crit"].iloc[0]), 4),
         "CellAmdDesktopN": int(raw_cells.at[("AMD", "Desktop"), "count"]),
         "CellAmdLaptopN": int(raw_cells.at[("AMD", "Laptop"), "count"]),
         "CellNvidiaDesktopN": int(raw_cells.at[("Nvidia", "Desktop"), "count"]),
@@ -428,6 +448,21 @@ def collect_macros(
                     "p_value",
                 ].iloc[0]
             )
+        ),
+        "LogMsErr": dec(float(log_tbl.at["Residual", "ms"]), 4),
+        "RawLsdSigCount": int(raw_res.lsd_table["reject_h0"].sum()),
+        "LogLsdSigCount": int(log_res.lsd_table["reject_h0"].sum()),
+        "LogLsdDeskDiff": dec(
+            float(log_lsd_idx.at[("AMD-Desktop", "Nvidia-Desktop"), "abs_diff"]), 4
+        ),
+        "LogLsdDeskCrit": dec(
+            float(log_lsd_idx.at[("AMD-Desktop", "Nvidia-Desktop"), "lsd_crit"]), 4
+        ),
+        "LogLsdLapDiff": dec(
+            float(log_lsd_idx.at[("AMD-Laptop", "Nvidia-Laptop"), "abs_diff"]), 4
+        ),
+        "LogLsdLapCrit": dec(
+            float(log_lsd_idx.at[("AMD-Laptop", "Nvidia-Laptop"), "lsd_crit"]), 4
         ),
         "LogWelchDesktopP": fmt_p_rel(
             float(log_simple.at[("segment", "Desktop", "AMD", "Nvidia"), "p_value"])
@@ -664,6 +699,7 @@ def main() -> None:
         "anova_table_log.tex": build_anova_rows(log_res, is_log=True),
         "anova_tukey_raw.tex": build_tukey_rows(raw_res, digits=2),
         "anova_tukey_log.tex": build_tukey_rows(log_res, digits=3),
+        "anova_lsd_log.tex": build_lsd_rows(log_res, digits=4),
         "anova_simple_effects.tex": build_simple_effects_rows(raw_res, log_res),
     }
     for filename, content in table_outputs.items():
