@@ -1,0 +1,4 @@
+﻿Phương pháp,Thống kê,Giá trị tới hạn,Ước lượng,KTC 95%,Giá trị p
+Kiểm định t một mẫu (W),t = 29.43 (df = 2056),t_0.95 = 1.65; t_0.975 = 1.96,124.93 W,[121.61; 128.26] W,1.71e-159
+Wilcoxon có dấu (W),"W = 1,553,910",--,Trung vị 120.00 W,--,1.60e-134
+Kiểm định t trên ln(P),t = 15.02 (df = 2056),t_0.95 = 1.65,TB nhân 97.34 W,[94.08; 100.71] W,8.98e-49
