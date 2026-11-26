@@ -1,0 +1,137 @@
+% =====================================================================
+% Mục 1. Tổng quan dữ liệu
+%
+% Gói cần có trong file chính: booktabs, longtable, array, caption, url (hoặc hyperref).
+% Trước khi \input file này, file chính phải nạp các con số do code sinh ra:
+%   \input{generated/overview_numbers.tex}
+% (tạo bằng: python scripts/reports/report_overview.py; script này cũng sinh
+% generated/overview_variables_rows.tex cho bảng danh sách 34 biến). Mọi con số
+% trong lời văn đều là macro \Ovw..., nên chạy lại code là báo cáo tự cập nhật.
+% Không tham chiếu số mục hay số bảng của mục khác (cấu trúc báo cáo chưa chốt);
+% gọi theo nội dung: "phần tiền xử lý", "các mục sau".
+% =====================================================================
+
+\section{Tổng quan dữ liệu}
+\label{sec:overview}
+
+\subsection{Ngữ cảnh bài toán và nguồn dữ liệu}
+
+Bộ xử lý đồ họa (Graphics Processing Unit -- GPU) đóng vai trò trung tâm trong xử lý đồ
+họa, tính toán hiệu năng cao và trí tuệ nhân tạo. Bên cạnh hiệu năng tính toán, công suất
+thiết kế tối đa (\texttt{Max\_Power}, tính bằng Watts) là thông số kỹ thuật quan trọng,
+ảnh hưởng trực tiếp đến thiết kế tản nhiệt, công suất bộ nguồn khuyến nghị và chi phí vận
+hành hệ thống. Trong đề tài này, nhóm thực hiện phân tích thống kê các yếu tố kiến trúc
+phần cứng (quy mô đơn vị xử lý, xung nhịp, bộ nhớ, băng thông, tiến trình bán dẫn) ảnh
+hưởng đến công suất thiết kế tối đa của GPU rời, đồng thời kiểm chứng ngoài mẫu trên các
+thế hệ GPU giai đoạn 2018--2025.
+
+Nguồn dữ liệu chính của phần phân tích lịch sử là tệp \texttt{All\_GPUs.csv} thuộc bộ dữ
+liệu \textit{Computer Parts (CPUs and GPUs)} công bố trên Kaggle. Theo phần ghi nhận
+nguồn của tác giả tập dữ liệu, thông tin được tổng hợp từ cơ sở dữ liệu phần cứng
+Game-Debate, Intel và thông số kỹ thuật của các hãng sản xuất. Toàn bộ quá trình đọc,
+tổng hợp và phân tích số liệu được thực hiện bằng ngôn ngữ lập trình Python.
+
+\subsection{Mô tả tập dữ liệu gốc}
+
+Các đặc trưng cơ bản của tệp dữ liệu gốc trước khi lọc và làm sạch gồm:
+\begin{itemize}
+  \item \textbf{Tên tệp tin:} \texttt{All\_GPUs.csv}
+  \item \textbf{Nguồn:} {\small\url{https://www.kaggle.com/datasets/iliassekkaf/computerparts}}
+  \item \textbf{Số quan trắc:} \OvwRowsRaw{} quan trắc (dòng); mỗi quan trắc là một mẫu
+    sản phẩm GPU. Trong \OvwDateValid{} quan trắc có ngày phát hành hợp lệ, thời gian phát
+    hành trải từ \OvwDateMin{} đến \OvwDateMax{} (còn \OvwDateUnknown{} quan trắc ghi là
+    \texttt{Unknown Release Date}).
+  \item \textbf{Số lượng biến:} \OvwColsRaw{} biến (cột).
+  \item \textbf{Phân bố theo hãng sản xuất (\texttt{Manufacturer}):} \OvwManufacturerLevels{}
+    hãng gồm Nvidia (\OvwNvidiaCount{} mẫu; \OvwNvidiaPct{}\%), AMD (\OvwAmdCount{} mẫu;
+    \OvwAmdPct{}\%), Intel (\OvwIntelCount{} mẫu; \OvwIntelPct{}\%) và ATI (\OvwAtiCount{}
+    mẫu; \OvwAtiPct{}\%).
+  \item \textbf{Phân loại GPU:} theo biến \texttt{Dedicated}, tập dữ liệu có
+    \OvwDedicatedYes{} mẫu GPU rời, \OvwDedicatedNo{} mẫu GPU tích hợp và
+    \OvwDedicatedMissing{} mẫu khuyết thông tin; theo biến \texttt{Notebook\_GPU}, có
+    \OvwNotebookNo{} mẫu dành cho máy để bàn và \OvwNotebookYes{} mẫu dành cho laptop.
+  \item \textbf{Biến mục tiêu (\texttt{Max\_Power}):} công suất tiêu thụ tối đa (Watts),
+    có \OvwPowerObserved{} quan trắc có giá trị và \OvwPowerMissing{} quan trắc khuyết
+    (\OvwPowerMissingPct{}\%).
+\end{itemize}
+
+\subsection{Danh sách và phân loại các biến}
+
+Bảng~\ref{tab:overview_variables} liệt kê toàn bộ \OvwColsRaw{} biến trong tệp gốc
+\texttt{All\_GPUs.csv}, chia thành sáu nhóm theo chức năng. Trong bảng, cột ``Kiểu gốc''
+ghi nhận kiểu dữ liệu khi đọc tệp CSV bằng \texttt{pandas.read\_csv} theo mặc định (khác
+với bước đọc toàn bộ dưới dạng chuỗi ở phần tiền xử lý); cột ``Loại biến'' thể hiện bản
+chất thống kê của từng biến; cột ``Khuyết (\%)'' được tính trên toàn bộ \OvwRowsRaw{} dòng
+của tệp gốc sau khi chuẩn hóa khoảng trắng và nhận diện cả các chuỗi đại diện cho giá trị
+khuyết (tỉ lệ khuyết này sẽ thay đổi ở phần tiền xử lý sau khi lọc đúng phạm vi GPU rời).
+
+\newlength{\ovwtblw}
+{\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\ovwtblw}{\dimexpr\linewidth-10\tabcolsep\relax}
+\begin{longtable}{@{}
+    >{\ttfamily\raggedright\arraybackslash}p{0.21\ovwtblw}
+    >{\centering\arraybackslash}p{0.09\ovwtblw}
+    >{\raggedright\arraybackslash}p{0.20\ovwtblw}
+    >{\centering\arraybackslash}p{0.11\ovwtblw}
+    >{\raggedright\arraybackslash}p{0.29\ovwtblw}
+    >{\raggedleft\arraybackslash}p{0.10\ovwtblw}@{}}
+  \caption{Danh sách \OvwColsRaw{} biến trong tệp gốc \texttt{All\_GPUs.csv}}
+  \label{tab:overview_variables} \\
+  \toprule
+  \normalfont\textbf{Biến} & \textbf{Kiểu gốc} & \textbf{Loại biến}
+    & \textbf{Đơn vị} & \textbf{Mô tả} & \textbf{Khuyết (\%)} \\
+  \midrule
+  \endfirsthead
+
+  \multicolumn{6}{@{}c@{}}{\textit{Bảng~\thetable{} -- tiếp theo}} \\
+  \toprule
+  \normalfont\textbf{Biến} & \textbf{Kiểu gốc} & \textbf{Loại biến}
+    & \textbf{Đơn vị} & \textbf{Mô tả} & \textbf{Khuyết (\%)} \\
+  \midrule
+  \endhead
+
+  \midrule
+  \multicolumn{6}{@{}r@{}}{\textit{Tiếp tục ở trang sau}} \\
+  \endfoot
+
+  \bottomrule
+  \multicolumn{6}{@{}p{\linewidth}@{}}{%
+    \footnotesize $^{*}$ Biến không có ô khuyết mặc định (\texttt{NaN}) nhưng chứa chuỗi
+    đại diện cho dữ liệu khuyết: \texttt{Release\_Date} có \OvwDateUnknown{} dòng
+    ``\texttt{Unknown Release Date}''; \texttt{Core\_Speed} có \OvwCoreSpeedDash{} dòng
+    ``\texttt{-}'' và \OvwCoreSpeedBlank{} dòng chỉ chứa ký tự xuống dòng.} \\
+  \endlastfoot
+
+  \csname @@input\endcsname generated/overview_variables_rows.tex
+\end{longtable}
+}
+
+\subsection{Nhận xét sơ bộ về dữ liệu gốc}
+
+{\sloppy
+\begin{itemize}
+  \item \textbf{Định dạng lưu trữ của các biến số:} Khi đọc bằng \texttt{pandas} theo mặc
+    định, chỉ \OvwDefaultNumericCols{} trong \OvwColsRaw{} biến được nhận diện là kiểu số
+    (\texttt{TMUs}, \texttt{Shader}, \texttt{Open\_GL} và bốn biến đếm cổng kết nối).
+    \OvwDefaultObjectCols{} biến còn lại ở dạng chuỗi ký tự, trong đó phần lớn các biến
+    định lượng (gồm cả biến mục tiêu \texttt{Max\_Power}) chứa đơn vị đo đi kèm như
+    ``\texttt{141 Watts}'', ``\texttt{738 MHz}'', ``\texttt{55nm}''; một số dòng còn dùng
+    ký hiệu nhân bản ``$a$ (x$N$)'' ở \texttt{ROPs} và \texttt{L2\_Cache}, hoặc
+    lẫn đơn vị \texttt{GB/sec} và \texttt{MB/sec} ở \texttt{Memory\_Bandwidth}.
+  \item \textbf{Dữ liệu khuyết và khuyết ẩn:} Biến mục tiêu \texttt{Max\_Power} khuyết
+    \OvwPowerMissingPct{}\%. Một số biến khuyết phần lớn giá trị như
+    \texttt{Release\_Price} (\OvwPriceMissingPct{}\%),
+    \texttt{DisplayPort\_\allowbreak{}Connection} (\OvwDpMissingPct{}\%) và
+    \texttt{Boost\_Clock} (\OvwBoostMissingPct{}\%). Ngoài ra, \texttt{Core\_Speed}
+    (\OvwCoreSpeedMissingPct{}\%) và \texttt{Release\_Date} (\OvwDateUnknownPct{}\%) chứa
+    giá trị khuyết dưới dạng chuỗi ký tự nên cần được nhận diện riêng thay vì chỉ kiểm tra
+    \texttt{NaN}.
+  \item \textbf{Phạm vi và mất cân bằng theo hãng:} Tập dữ liệu gộp cả GPU rời, GPU tích
+    hợp, GPU máy để bàn, laptop và trải dài gần 20 năm (1998--2017). Theo hãng sản xuất,
+    Nvidia và AMD chiếm hơn 89\% tổng số quan trắc, trong khi Intel và ATI chiếm tỉ lệ
+    nhỏ. Các bước chọn biến và lọc quan sát về đúng phạm vi GPU rời được trình bày cụ thể
+    ở phần tiền xử lý.
+\end{itemize}
+\par}
