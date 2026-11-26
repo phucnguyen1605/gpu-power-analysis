@@ -1,0 +1,165 @@
+\documentclass[12pt, a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage[unicode]{hyperref}
+
+\definecolor{codebg}{RGB}{248, 250, 252}
+\definecolor{codekw}{RGB}{29, 78, 216}
+\definecolor{codecmt}{RGB}{100, 116, 139}
+\definecolor{codestr}{RGB}{15, 118, 110}
+
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=tb,
+  rulecolor=\color{black!25},
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  keywordstyle=\color{codekw}\bfseries,
+  commentstyle=\color{codecmt}\itshape,
+  stringstyle=\color{codestr},
+  captionpos=b
+}
+\renewcommand{\lstlistingname}{Đoạn code}
+
+\begin{document}
+
+\setcounter{section}{4}
+\section{Thống kê suy diễn}
+\setcounter{subsection}{1}
+\subsection{Bài toán kiểm định hai mẫu độc lập}
+
+\subsubsection{Đề xuất phương pháp}
+Card đồ họa rời trên máy tính để bàn (Desktop) và máy tính xách tay (Laptop) chịu các ràng buộc vật lý rất khác nhau về không gian tản nhiệt, kích thước bo mạch và nguồn cấp điện. Trên máy tính để bàn, khe cắm PCIe~x16 cấp tối đa $75$\,W và card có thể nhận thêm công suất từ đầu nguồn phụ của bộ nguồn (PSU), trong khi card đồ họa trên laptop bị giới hạn chặt bởi công suất bộ sạc và khả năng thoát nhiệt của khung máy mỏng.
+
+\textbf{Bài toán.} Với mức ý nghĩa $\alpha = 0{,}05$, công suất thiết kế tối đa trung bình (\texttt{max\_power\_w}) của GPU rời dành cho máy tính để bàn (Desktop) có khác biệt có ý nghĩa thống kê so với GPU rời dành cho máy tính xách tay (Laptop) hay không?
+
+Bài toán sử dụng toàn bộ $2\,057$ card đồ họa rời trong bộ dữ liệu sạch ở Mục~3, chia thành hai nhóm theo biến \texttt{segment}: nhóm Desktop ($n_1 = 1\,786$ card) và nhóm Laptop ($n_2 = 271$ card). Theo Bảng~\ref{tab:two_sample_groups}, công suất trung bình và độ phân tán của nhóm Desktop đều cao hơn rõ rệt so với nhóm Laptop; có tới $71{,}1\%$ card Desktop vượt ngưỡng $75$\,W của khe PCIe, trong khi tỉ lệ này ở Laptop chỉ là $13{,}7\%$.
+
+\begin{table}[H]
+  \centering
+  \caption{Đặc trưng mẫu của công suất tối đa (W) theo phân khúc thiết bị; $p$ là giá trị $p$ của kiểm định Shapiro--Wilk ở Mục~5.2.2.a.}
+  \label{tab:two_sample_groups}
+  \begin{tabular}{lrrrrrrr}
+    \toprule
+    Phân khúc & Số card & Trung bình & Độ lệch chuẩn & Trung vị & IQR & Min--Max & $p$ \\
+    \midrule
+    Desktop & $1\,786$ & $137{,}1$ & $74{,}3$ & $140$ & $105$ & $18$--$375$ & $<$ 0,001 \\
+    Laptop  & $271$    & $44{,}5$  & $33{,}8$ & $35$  & $30$  & $5$--$220$  & $<$ 0,001 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\IfFileExists{generated/two_sample_boxplot.pdf}{%
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\linewidth]{generated/two_sample_boxplot.pdf}
+    \caption{So sánh phân bố công suất tối đa giữa GPU rời Desktop và Laptop. Vạch cam là trung vị, tam giác xanh là trung bình, đường nét đứt đỏ là ngưỡng $75$\,W của khe PCIe.}
+    \label{fig:two_sample_boxplot}
+  \end{figure}
+}{}
+
+Gọi $\mu_1$ và $\mu_2$ lần lượt là công suất tối đa trung bình tổng thể của GPU rời Desktop và Laptop, đặt $\Delta = \mu_1 - \mu_2$. Cặp giả thuyết kiểm định hai phía là
+\[
+  H_0: \mu_1 = \mu_2 \quad (\Delta = 0), \qquad H_1: \mu_1 \neq \mu_2 \quad (\Delta \neq 0).
+\]
+Để chọn phép kiểm định phù hợp, ta xét ba điều kiện: tính chuẩn trong từng nhóm, tính đồng nhất phương sai và tính độc lập của các quan sát. Hai điều kiện đầu được kiểm tra ở Mục~5.2.2.a và Mục~5.2.2.b. Điều kiện thứ ba không thỏa mãn tuyệt đối: nhiều mẫu card thương mại dùng chung một kiến trúc chip (cột \texttt{architecture} chỉ có $356$ nhãn khác nhau trên $2\,057$ card, trong đó $222$ ở Desktop và $150$ ở Laptop) nên các quan sát có sự phụ thuộc theo cụm chip. Mục~5.2.2.d kiểm tra thêm độ nhạy bằng cách lấy trung bình theo từng kiến trúc chip để đánh giá ảnh hưởng của hiện tượng này.
+
+\subsubsection{Phân tích kiểm định hai mẫu}
+
+\paragraph{5.2.2.a Kiểm tra điều kiện phân phối chuẩn.}
+Đặt $H_0$: công suất trong từng nhóm tuân theo phân phối chuẩn; $H_1$: không tuân theo phân phối chuẩn. Kiểm định Shapiro--Wilk bác bỏ $H_0$ ở cả hai nhóm: nhóm Desktop cho $W = 0{,}964$ ($p = 1{,}0 \cdot 10^{-20} < 0{,}001$) và nhóm Laptop cho $W = 0{,}840$ ($p = 4{,}8 \cdot 10^{-16} < 0{,}001$). Nhóm Laptop lệch phải rõ rệt với $34$ quan sát vượt rào chắn trên $Q_3 + 1{,}5\,\text{IQR} = 95$\,W (các dòng GPU hiệu năng cao như GTX~1080 Ti Mobile đạt $220$\,W). Tuy nhiên, vì cỡ mẫu của cả hai nhóm đều lớn ($n_1 = 1\,786$ và $n_2 = 271$), theo định lý giới hạn trung tâm (CLT), phân phối của hiệu hai trung bình mẫu vẫn xấp xỉ chuẩn~\cite{lumley2002}; đồng thời ta đối chiếu thêm bằng kiểm định phi tham số Mann--Whitney~$U$ và kiểm định trên thang logarit.
+
+\IfFileExists{generated/two_sample_qq.pdf}{%
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.88\linewidth]{generated/two_sample_qq.pdf}
+    \caption{Đồ thị Q--Q chuẩn của công suất tối đa ở nhóm Desktop và Laptop; đường đỏ là đường tham chiếu phân phối chuẩn.}
+    \label{fig:two_sample_qq}
+  \end{figure}
+}{}
+
+\paragraph{5.2.2.b Kiểm định tính đồng nhất phương sai.}
+Đặt $H_0: \sigma_1^2 = \sigma_2^2$ và $H_1: \sigma_1^2 \neq \sigma_2^2$. Kiểm định Levene sử dụng trung vị (Brown--Forsythe) cho thống kê $F_{BF} = 197{,}23$ với bậc tự do $(1;\ 2\,055)$ và $p = 7{,}5 \cdot 10^{-43} < 0{,}001$, bác bỏ giả thuyết phương sai bằng nhau. Độ lệch chuẩn của nhóm Desktop ($74{,}3$\,W) gấp $2{,}2$ lần nhóm Laptop ($33{,}8$\,W), đồng thời cỡ mẫu hai nhóm chênh lệch tới $6{,}6$ lần. Do đó, kiểm định $t$ hai mẫu với phương sai gộp không phù hợp và \textbf{kiểm định $t$ Welch} được chọn làm phương pháp suy diễn chính.
+
+\paragraph{5.2.2.c Kiểm định Welch hai mẫu độc lập.}
+Chênh lệch trung bình mẫu là $\bar{x}_1 - \bar{x}_2 = 137{,}1 - 44{,}5 = 92{,}6$\,W, với sai số chuẩn
+\[
+  SE_W = \sqrt{\frac{s_1^2}{n_1} + \frac{s_2^2}{n_2}} = 2{,}70\text{\,W}.
+\]
+Thống kê kiểm định Welch và bậc tự do xấp xỉ Satterthwaite là
+\[
+  t_W = \frac{\bar{x}_1 - \bar{x}_2}{SE_W} = 34{,}29, \qquad \nu = 749{,}9.
+\]
+Với mức ý nghĩa $\alpha = 0{,}05$ (hai phía), miền bác bỏ là $|t_W| > t_{0{,}975;\ 749{,}9} = 1{,}96$. Giá trị quan sát $t_W = 34{,}29$ nằm sâu trong miền bác bỏ với $p = 1{,}1 \cdot 10^{-155} < 0{,}001$, nên ta bác bỏ $H_0$. Khoảng tin cậy $95\%$ cho chênh lệch trung bình $\mu_1 - \mu_2$ là
+\[
+  CI_{95\%}(\Delta) = 92{,}6 \pm 1{,}96 \times 2{,}70 = [87{,}3;\ 97{,}9]\text{\,W}.
+\]
+Chỉ số độ lớn hiệu ứng Cohen's $d = 1{,}32$ cho thấy mức độ chênh lệch giữa hai phân khúc là rất lớn về mặt thực tiễn. Các lệnh Python thực hiện kiểm định được tóm tắt ở Đoạn code~\ref{lst:two_sample}.
+
+\begin{lstlisting}[caption={Các kiểm định chính của bài toán so sánh hai mẫu (rút gọn từ \texttt{report\_two\_sample.py}).}, label={lst:two_sample}]
+import numpy as np
+from scipy import stats
+
+desktop = gpu.loc[gpu["segment"] == "Desktop", "max_power_w"]
+laptop = gpu.loc[gpu["segment"] == "Laptop", "max_power_w"]
+
+# Normality and equal-variance checks
+stats.shapiro(desktop)
+stats.shapiro(laptop)
+stats.levene(desktop, laptop, center="median")
+
+# Primary Welch t-test and robustness checks
+stats.ttest_ind(desktop, laptop, equal_var=False)
+stats.ttest_ind(desktop, laptop, equal_var=True)
+stats.mannwhitneyu(desktop, laptop, alternative="two-sided")
+stats.ttest_ind(np.log(desktop), np.log(laptop), equal_var=False)
+\end{lstlisting}
+
+\paragraph{5.2.2.d Kiểm tra độ bền vững của kết quả.}
+Để bảo đảm kết luận không phụ thuộc vào giả định phân phối hay cấu trúc dữ liệu, ta thực hiện bốn phép kiểm tra bổ trợ (tổng hợp ở Bảng~\ref{tab:two_sample_tests}):
+\begin{itemize}
+  \item \textbf{Kiểm định $t$ phương sai gộp:} Cho $t = 20{,}22$ ($\nu = 2\,055$, $p = 4{,}9 \cdot 10^{-83} < 0{,}001$), khoảng tin cậy $95\%$ là $[83{,}7;\ 101{,}6]$\,W. Mặc dù $t$ gộp bị kéo giảm vì nhóm lớn hơn (Desktop) lại có phương sai lớn hơn, kết luận bác bỏ $H_0$ vẫn không thay đổi.
+  \item \textbf{Kiểm định phi tham số Mann--Whitney $U$:} Không yêu cầu giả định chuẩn, cho $U = 426\,297$ ($p = 3{,}5 \cdot 10^{-91} < 0{,}001$). Xác suất một card Desktop ngẫu nhiên có công suất cao hơn một card Laptop ngẫu nhiên đạt $\hat{P}(X_1 > X_2) = 0{,}881$ ($88{,}1\%$, tương quan nhị phân hạng $r_{rb} = 0{,}762$).
+  \item \textbf{Kiểm định Welch trên thang logarit ($\ln P$):} Nhằm giảm ảnh hưởng của độ lệch phải, phép kiểm định cho $t_W = 25{,}43$ ($\nu = 340{,}9$, $p = 1{,}0 \cdot 10^{-80} < 0{,}001$). Biến đổi ngược cho thấy trung bình nhân công suất của Desktop gấp $3{,}32$ lần Laptop (KTC $95\%$: $[3{,}03;\ 3{,}65]$ lần).
+  \item \textbf{Kiểm tra mức kiến trúc chip và phân tầng theo hãng:} Khi gộp trung bình công suất theo từng cặp $(\text{phân khúc}, \text{kiến trúc})$ để loại bỏ trùng lặp phiên bản thương mại ($n_1 = 222$, $n_2 = 150$), chênh lệch trung bình vẫn đạt $78{,}3$\,W (KTC $95\%$: $[66{,}5;\ 90{,}1]$\,W; $t_W = 13{,}06$; $p = 1{,}0 \cdot 10^{-31} < 0{,}001$). Khi xét riêng từng hãng sản xuất, chênh lệch Desktop--Laptop vẫn rất lớn ở cả Nvidia ($87{,}9$\,W, $t_W = 24{,}03$) và AMD ($100{,}3$\,W, $t_W = 24{,}18$).
+\end{itemize}
+
+\begin{table}[H]
+  \centering
+  \caption{Tổng hợp kết quả kiểm định hai mẫu và các phép kiểm tra độ bền vững giữa Desktop và Laptop.}
+  \label{tab:two_sample_tests}
+  \begin{tabular}{llllll}
+    \toprule
+    Phương pháp & Thống kê & Ước lượng & KTC $95\%$ & Giá trị $p$ & Kết luận \\
+    \midrule
+    Welch $t$ (chính, W)          & $t_W = 34{,}29$ ($\nu = 749{,}9$)   & $92{,}6$\,W                        & $[87{,}3;\ 97{,}9]$   & $<$ 0,001 & Bác bỏ $H_0$ \\
+    $t$ phương sai gộp (W)        & $t = 20{,}22$ ($\nu = 2\,055$)     & $92{,}6$\,W                        & $[83{,}7;\ 101{,}6]$  & $<$ 0,001 & Bác bỏ $H_0$ \\
+    Mann--Whitney $U$             & $U = 426\,297$                     & $\hat{P}(X_1 > X_2) = 0{,}881$     & --                    & $<$ 0,001 & Bác bỏ $H_0$ \\
+    Welch $t$ trên $\ln P$        & $t_W = 25{,}43$ ($\nu = 340{,}9$)   & Tỉ số $3{,}32\times$               & $[3{,}03;\ 3{,}65]$   & $<$ 0,001 & Bác bỏ $H_0$ \\
+    Welch $t$ mức kiến trúc (W)   & $t_W = 13{,}06$ ($\nu = 330{,}2$)   & $78{,}3$\,W                        & $[66{,}5;\ 90{,}1]$   & $<$ 0,001 & Bác bỏ $H_0$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsubsection{Kết luận}
+Ở mức ý nghĩa $\alpha = 0{,}05$, có bằng chứng thống kê rất mạnh ($p = 1{,}1 \cdot 10^{-155}$) khẳng định công suất thiết kế tối đa trung bình của GPU rời trên máy tính để bàn cao hơn đáng kể so với GPU rời trên máy tính xách tay. Cụ thể, trong tập dữ liệu khảo sát (giai đoạn 2003--2017), công suất trung bình của GPU Desktop đạt $137{,}1$\,W so với $44{,}5$\,W của GPU Laptop, chênh lệch trung bình $92{,}6$\,W (khoảng tin cậy $95\%$: $[87{,}3;\ 97{,}9]$\,W).
+
+Kết quả này nhất quán qua mọi phương pháp kiểm chứng (Mann--Whitney~$U$, kiểm định trên thang logarit, kiểm định theo kiến trúc chip và phân tầng theo hãng sản xuất) và phản ánh trực tiếp giới hạn tản nhiệt cùng nguồn điện trên thiết bị di động. Tuy nhiên, do nhiều mẫu card thương mại chia sẻ chung một nhân GPU nên các quan sát chưa độc lập hoàn toàn, và kết luận chỉ áp dụng trong phạm vi các GPU rời thuộc cơ sở dữ liệu nghiên cứu.
+
+\begin{thebibliography}{9}
+\bibitem{lumley2002}
+T.~Lumley, P.~Diehr, S.~Emerson, and L.~Chen, ``The importance of the normality assumption in large public health data sets,'' \textit{Annu. Rev. Public Health}, vol.~23, pp.~151--169, 2002.
+\end{thebibliography}
+
+\end{document}

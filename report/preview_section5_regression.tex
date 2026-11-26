@@ -1,0 +1,55 @@
+% Xem trước riêng Mục 5.2 (hồi quy tuyến tính bội) khi chưa ghép vào báo cáo chính.
+% Biên dịch từ thư mục report/:
+%   python ../scripts/reports/report_regression.py   (nếu dữ liệu thay đổi)
+%   tectonic preview_section5_regression.tex
+\documentclass[12pt,a4paper]{article}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{fontspec}
+\setmainfont{texgyretermes}[Extension=.otf,UprightFont=*-regular,
+  BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
+\setmonofont{DejaVuSansMono}[Extension=.ttf,Scale=0.85,BoldFont=*-Bold]
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,array}
+\usepackage{caption}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\lstlistingname}{Đoạn code}
+\renewcommand{\refname}{Tài liệu tham khảo}
+\counterwithin{table}{section}
+\counterwithin{figure}{section}
+\AtBeginDocument{\counterwithin{lstlisting}{section}}
+\setcounter{secnumdepth}{4}
+\renewcommand{\theparagraph}{\thesubsubsection.\alph{paragraph}}
+\lstset{basicstyle=\small\ttfamily, keywordstyle=\color{blue},
+  stringstyle=\color{violet}, frame=tb, breaklines=true,
+  showstringspaces=false, columns=flexible}
+
+\input{generated/regression_numbers.tex}
+
+% Mục 5.2 tham chiếu Mục 5.1 (ANOVA); bản xem trước riêng khai báo sẵn hai nhãn này.
+\makeatletter
+\newlabel{sec:anova}{{5.1}{}}
+\newlabel{sec:anova-method}{{5.1.1}{}}
+\makeatother
+
+\frenchspacing
+\begin{document}
+\setcounter{section}{4}
+\section{Thống kê suy diễn}
+\setcounter{subsection}{1}
+\input{sections/05_2_regression.tex}
+
+% Mục 5.2 trích dẫn hai tài liệu này; file chính cần có cùng khóa.
+\begin{thebibliography}{9}
+  \bibitem{cameron2015} A.~C. Cameron and D.~L. Miller, ``A practitioner's guide to
+    cluster-robust inference,'' \emph{J. Human Resources}, vol.~50, no.~2, pp.~317--372,
+    2015, doi: 10.3368/jhr.50.2.317.
+  \bibitem{duan1983} N.~Duan, ``Smearing estimate: A nonparametric retransformation
+    method,'' \emph{J. Amer. Statist. Assoc.}, vol.~78, no.~383, pp.~605--610, 1983,
+    doi: 10.1080/01621459.1983.10478017.
+\end{thebibliography}
+\end{document}

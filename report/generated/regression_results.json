@@ -1,0 +1,32 @@
+{
+  "hypothesis": "Four technical slopes jointly zero, controlling vendor and segment",
+  "alpha": 0.005,
+  "n": 1837,
+  "excluded": 220,
+  "clusters": 273,
+  "covariance": "architecture-clustered CR1",
+  "f": 273.5053147788476,
+  "df_num": 4.0,
+  "df_denom": 272.0,
+  "p": 5.250890126334925e-94,
+  "r_squared_log": 0.8794888653137813,
+  "grouped_cv_watts": {
+    "rmse": 31.557084967489256,
+    "mae": 22.703735246609938,
+    "r2": 0.836395612333849
+  },
+  "source_sha256": "5f429dd92e0fdf07404122334b7970ae7bb38aaaef891cdae68ed89804c7a41b",
+  "versions": {
+    "numpy": "2.5.4",
+    "pandas": "3.1.0",
+    "scipy": "1.18.1",
+    "statsmodels": "0.15.0"
+  },
+  "notes": [
+    "Pointwise coefficient tests are not adjusted for multiple comparisons.",
+    "Conventional residual diagnostic p-values are not cluster-corrected.",
+    "Clusters use supplied architecture labels and are assumed independent.",
+    "Overall smearing does not guarantee the conditional arithmetic mean.",
+    "Forecast CIs describe geometric means, not new individual GPU outcomes."
+  ]
+}
