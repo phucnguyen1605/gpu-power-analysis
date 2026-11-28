@@ -1,0 +1,361 @@
+% !TeX program = xelatex
+% MAU DINH DANG BAO CAO TU PDF Assignment_Xac_suat_thong_ke.
+% Day la mau bo cuc co the chinh sua, khong phai ban chep toan van PDF.
+% Bien dich bang XeLaTeX 2 lan de cap nhat muc luc va tong so trang.
+% Dat logo_bach_khoa.png cung thu muc voi tep .tex nay.
+\documentclass[10pt,a4paper]{article}
+
+% ==================== 1. TIENG VIET VA PHONG CHU ====================
+\usepackage{fontspec}
+\setmainfont{Latin Modern Roman}
+\setsansfont{Latin Modern Sans}
+\setmonofont{Latin Modern Mono}
+\usepackage{polyglossia}
+\setdefaultlanguage{vietnamese}
+
+% ==================== 2. KHO GIAY VA LE TRANG ======================
+% Cac kich thuoc duoc dung lai theo bo cuc quan sat trong PDF mau.
+\usepackage[
+  a4paper,
+  left=3.15cm,right=3.15cm,
+  top=4.30cm,bottom=3.90cm,
+  headheight=27pt,headsep=15pt,footskip=19pt
+]{geometry}
+\setlength{\parindent}{15pt}
+\setlength{\parskip}{0pt}
+\linespread{1}
+\raggedbottom
+\setlength{\emergencystretch}{1.5em}
+
+% ==================== 3. CAC GOI DINH DANG =========================
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{unicode-math}
+\setmathfont{Latin Modern Math}
+\usepackage{graphicx}
+\usepackage[table]{xcolor}
+\definecolor{TableHead}{HTML}{E8EDF2}
+\usepackage{array,tabularx,longtable,booktabs}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+\usepackage{hyperref}
+\hypersetup{hidelinks,unicode=true,pdfauthor={},
+  pdftitle={Phân tích các yếu tố ảnh hưởng đến công suất tiêu thụ của GPU rời}}
+\urlstyle{same}
+
+% ==================== 4. THONG TIN CAN THAY ========================
+% Sua cac lenh duoi day de dung cho bai cua nhom.
+\newcommand{\TenDaiHoc}{ĐẠI HỌC QUỐC GIA THÀNH PHỐ HỒ CHÍ MINH}
+\newcommand{\TenTruong}{TRƯỜNG ĐẠI HỌC BÁCH KHOA}
+\newcommand{\TenKhoa}{KHOA KHOA HỌC VÀ KỸ THUẬT MÁY TÍNH}
+\newcommand{\TenMonHoc}{XÁC SUẤT VÀ THỐNG KÊ (MT2013)}
+\newcommand{\HocKy}{261}
+\newcommand{\NamHoc}{2026 - 2027}
+\newcommand{\TenDeTai}{Phân tích các yếu tố ảnh hưởng đến\\
+  công suất tiêu thụ của GPU rời}
+\newcommand{\GiangVien}{Huỳnh Thái Duy Phương}
+\newcommand{\LopNhom}{Lớp L11, Nhóm 19}
+\newcommand{\DiaDiemNgayThang}{Thành phố Hồ Chí Minh, tháng 11 năm 2026}
+\newcommand{\NoiDungChanTrang}{Bài tập lớn môn học Xác suất và Thống kê
+  (Học kỳ \HocKy) - Năm học \NamHoc}
+
+% ==================== 4b. NAP SO LIEU SINH TU PYTHON ===============
+\input{generated/overview_numbers.tex}
+\input{generated/preprocessing_numbers.tex}
+\input{generated/anova_numbers.tex}
+\input{generated/anova_two_way_numbers.tex}
+\input{generated/regression_numbers.tex}
+
+% ==================== 5. DAU TRANG VA CHAN TRANG ===================
+\newcommand{\LogoTruong}[1]{%
+  \IfFileExists{logo_bach_khoa.png}{%
+    \includegraphics[width=#1]{logo_bach_khoa.png}%
+  }{\fbox{\parbox[c][#1][c]{#1}{\centering\scriptsize LOGO}}}%
+}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{%
+  \begin{minipage}[c]{1.5cm}
+    \hspace*{2mm}\LogoTruong{8mm}
+  \end{minipage}%
+  \begin{minipage}[c]{\dimexpr\textwidth-1.5cm\relax}
+    \ttfamily\fontsize{10}{12}\selectfont
+    Trường Đại học Bách khoa TP. Hồ Chí Minh\\
+    Khoa Khoa học và Kỹ thuật Máy tính
+  \end{minipage}%
+}
+\fancyfoot[L]{\ttfamily\fontsize{7}{9}\selectfont\NoiDungChanTrang}
+\fancyfoot[R]{\ttfamily\fontsize{7}{9}\selectfont Page \thepage/\pageref*{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\fancypagestyle{plain}{\pagestyle{fancy}}
+
+% ==================== 6. TIEU DE VA MUC LUC ========================
+\setcounter{secnumdepth}{4}
+\setcounter{tocdepth}{4}
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalfont\normalsize\bfseries}{\thesubsubsection}{1em}{}
+% Cap thu tu theo mau: 5.1.2.a, 5.1.2.b, ...
+\renewcommand{\theparagraph}{\thesubsubsection.\alph{paragraph}}
+\titleformat{\paragraph}[block]{\normalfont\normalsize\bfseries}{\theparagraph}{1em}{}
+\titlespacing*{\section}{0pt}{3.5ex plus 1ex minus .2ex}{2.3ex plus .2ex}
+\titlespacing*{\subsection}{0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
+\titlespacing*{\subsubsection}{0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
+\titlespacing*{\paragraph}{0pt}{2ex plus .5ex}{1ex}
+\setlist[itemize]{leftmargin=2.5em,itemsep=.7ex,topsep=.8ex}
+\setlist[enumerate]{leftmargin=2.5em,itemsep=.7ex,topsep=.8ex}
+\gappto\captionsvietnamese{%
+  \renewcommand{\contentsname}{Mục lục}%
+  \renewcommand{\listfigurename}{Danh sách hình vẽ}%
+  \renewcommand{\listtablename}{Danh sách bảng}%
+  \renewcommand{\figurename}{Hình}%
+  \renewcommand{\tablename}{Bảng}%
+  \renewcommand{\lstlistingname}{Đoạn code}%
+  \renewcommand{\refname}{Tài liệu tham khảo}%
+}
+\captionsetup{font=normalsize,labelfont=normalfont,labelsep=colon,skip=8pt}
+
+% ==================== 7. MA NGUON VA HINH MINH HOA ================
+% Mac dinh Python. Co the doi language=R neu can trinh bay ma R.
+\definecolor{codegreen}{RGB}{0,110,0}
+\definecolor{codeblue}{RGB}{0,0,160}
+\lstdefinestyle{maubaocao}{%
+  language=Python,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codeblue},
+  commentstyle=\color{codegreen},
+  stringstyle=\color{codegreen},
+  showstringspaces=false,
+  keepspaces=true,
+  columns=fullflexible,
+  breaklines=true,
+  breakatwhitespace=false,
+  tabsize=4,
+  frame=none,
+  numbers=none,
+  aboveskip=6pt,belowskip=6pt
+}
+\lstset{style=maubaocao}
+% Chen hinh: \HinhBaoCao{duong_dan_anh}{Chu thich}{nhan-tham-chieu}
+% Neu chua co anh, mau tu hien khung trong de van bien dich duoc.
+\newcommand{\HinhBaoCao}[3]{%
+  \begin{figure}[H]
+    \centering
+    \IfFileExists{#1}{%
+      \includegraphics[width=.96\linewidth,height=.33\textheight,keepaspectratio]{#1}%
+    }{%
+      \fbox{\begin{minipage}[c][4cm][c]{.92\linewidth}
+        \centering\itshape Vị trí chèn hình minh họa\\[6pt]
+        \normalfont\small Thay bằng hình hoặc biểu đồ của nhóm.
+      \end{minipage}}%
+    }
+    \caption{#2}\label{#3}
+  \end{figure}%
+}
+
+\begin{document}
+
+% ==================== TRANG BIA ==================================
+% Bia khong danh so. Cac node dat theo vi tri cua PDF tham chieu.
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture,overlay]
+  \node[anchor=north,inner sep=0,align=center]
+    at ([yshift=-46.7mm]current page.north) {%
+      \begin{minipage}{16cm}\centering
+        \fontsize{10}{14}\selectfont
+        \TenDaiHoc\\\TenTruong\\\TenKhoa
+      \end{minipage}};
+  \node[anchor=north,inner sep=0]
+    at ([yshift=-77.7mm]current page.north) {\LogoTruong{40mm}};
+  \node[anchor=north west,inner sep=0]
+    at ([xshift=48.2mm,yshift=-141.8mm]current page.north west) {%
+      \begin{minipage}{114mm}
+        {\fontsize{14.4}{17.3}\selectfont\bfseries\TenMonHoc\par}
+        \vspace{5mm}\hrule height .4pt\vspace{4mm}
+        {\fontsize{14.4}{17.3}\selectfont\bfseries
+          Báo cáo bài tập lớn (Học kỳ 261)\par}
+        \vspace{4mm}
+        {\fontsize{17.2}{19.3}\selectfont\bfseries Phân tích các yếu tố ảnh hưởng đến công suất tiêu thụ của GPU rời\par}
+        \vspace{1mm}\hrule height .4pt
+      \end{minipage}};
+  \node[anchor=north west,inner sep=0]
+    at ([xshift=56mm,yshift=-197.8mm]current page.north west) {%
+      \begin{minipage}{139mm}
+        \fontsize{10}{12.4}\selectfont
+        \begin{tabular}{@{}r@{\hspace{4mm}}l@{}}
+          Giảng viên hướng dẫn: & Huỳnh Thái Duy Phương\\[4mm]
+          Danh sách thành viên: & [Nguyễn Hoàng	Phúc] - [2633036] (Lớp L11, Nhóm 19)\\
+          & [Nguyễn Quốc Đạt] - [2510287] (Lớp L11, Nhóm 19)\\
+          & [Nguyễn Thái Sơn] - [2510216] (Lớp L11, Nhóm 19)\\
+          & [Nguyễn Thanh Lộc] - [2311958] (Lớp L11, Nhóm 19)\\
+          & [Văn Đức Hàng] - [2510303] (Lớp L11, Nhóm 19)\\
+        \end{tabular}
+      \end{minipage}};
+  \node[anchor=north,inner sep=0]
+    at ([yshift=-236.2mm]current page.north) {%
+      \fontsize{8}{10}\selectfont Thành phố Hồ Chí Minh, tháng 11 năm 2026};
+\end{tikzpicture}
+\null
+\end{titlepage}
+
+% ==================== PHAN CONG NHIEM VU ==========================
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\begin{center}
+  {\Large\bfseries Bảng phân công nhiệm vụ và mức độ đóng góp\par}
+\end{center}
+\vspace{3mm}
+\begingroup
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.15}
+\noindent\begin{tabularx}{\textwidth}{|c|>{\centering\arraybackslash}p{2.8cm}|c|>{\centering\arraybackslash}X|c|}
+  \hline
+  \textbf{STT} & \textbf{Họ và tên} & \textbf{MSSV} & \textbf{Nhiệm vụ} & \textbf{Mức độ đóng góp}\\\hline
+  1 & [Nguyễn Hoàng	Phúc] & [2633036] & [Nhiệm vụ thành viên 1] & [\ldots]\,\%\\\hline
+  2 & [Nguyễn Quốc Đạt] & [2510287] & [Nhiệm vụ thành viên 2] & [\ldots]\,\%\\\hline
+  3 & [Nguyễn Thái Sơn] & [2510216] & [Nhiệm vụ thành viên 3] & [\ldots]\,\%\\\hline
+  4 & [Nguyễn Thanh Lộc] & [2311958] & [Nhiệm vụ thành viên 4] & [\ldots]\,\%\\\hline
+  5 & [Văn Đức Hàng] & [2510303] & [Nhiệm vụ thành viên 5] & [\ldots]\,\%\\\hline
+\end{tabularx}
+\endgroup
+
+% ==================== MUC LUC VA DANH SACH HINH ===================
+\clearpage
+\tableofcontents
+\clearpage
+\phantomsection
+\addcontentsline{toc}{section}{\listfigurename}
+\listoffigures
+% Neu can danh sach bang, bo dau % o ba dong sau:
+% \clearpage
+% \addcontentsline{toc}{section}{\listtablename}
+% \listoftables
+
+% ==================== NOI DUNG BAO CAO ============================
+\clearpage
+\emergencystretch=3em
+
+% Mục 1: Tổng quan dữ liệu
+\input{sections/01_overview.tex}
+
+% Mục 2: Kiến thức nền
+\clearpage
+\input{sections/02_background.tex}
+
+% Mục 3: Tiền xử lý số liệu (bản rút gọn, dữ liệu 2057 dòng)
+\clearpage
+\input{sections/03_preprocessing.tex}
+
+% Mục 4: Thống kê mô tả (dữ liệu 2057 dòng)
+\clearpage
+\input{sections/04_descriptive.tex}
+
+% Mục 5: Thống kê suy diễn (gồm đủ 5 phương pháp)
+\clearpage
+\section{Thống kê suy diễn}
+\label{sec:inferential}
+
+% 5.1 Kiểm định 1 mẫu
+\input{sections/05_1_one_sample.tex}
+
+% 5.2 Kiểm định 2 mẫu
+\clearpage
+\input{sections/05_2_two_sample.tex}
+
+% 5.3 ANOVA 1 chiều
+\clearpage
+\input{sections/05_3_anova_one_way.tex}
+
+% 5.4 ANOVA 2 chiều
+\clearpage
+\input{sections/05_4_anova_two_way.tex}
+
+% 5.5 Hồi quy tuyến tính đa biến
+\clearpage
+\input{sections/05_5_regression.tex}
+
+% Mục 6 & Mục 7 (giữ nguyên khung để hoàn thiện sau)
+\clearpage
+\section{Thảo luận và mở rộng}
+[Tóm tắt phát hiện chính, giới hạn và hướng nghiên cứu tiếp theo.]
+
+\section{Nguồn dữ liệu và nguồn code}
+\begin{itemize}
+  \item Dữ liệu: [Tên nguồn và đường dẫn].
+  \item Mã nguồn: [Đường dẫn kho mã hoặc tệp đính kèm].
+\end{itemize}
+
+% ==================== TAI LIEU THAM KHAO ==========================
+\clearpage
+\renewcommand{\refname}{Tài liệu tham khảo}
+\begin{thebibliography}{99}
+  % Các tài liệu đã có từ Mục 3 và Mục 5
+  \bibitem{vandenbroeck2005} J.~Van den Broeck, S.~Argeseanu Cunningham, R.~Eeckels, and
+    K.~Herbst, ``Data cleaning: Detecting, diagnosing, and editing data abnormalities,''
+    \emph{PLoS Med.}, vol.~2, no.~10, p.~e267, 2005, doi: 10.1371/journal.pmed.0020267.
+  \bibitem{donders2006} A.~R.~T. Donders, G.~J.~M.~G. van der Heijden, T.~Stijnen, and
+    K.~G.~M. Moons, ``Review: A gentle introduction to imputation of missing values,''
+    \emph{J. Clin. Epidemiol.}, vol.~59, no.~10, pp.~1087--1091, 2006,
+    doi: 10.1016/j.jclinepi.2006.01.014.
+  \bibitem{lumley2002} T.~Lumley, P.~Diehr, S.~Emerson, and L.~Chen, ``The importance of
+    the normality assumption in large public health data sets,'' \emph{Annu. Rev. Public
+    Health}, vol.~23, pp.~151--169, 2002, doi: 10.1146/annurev.publhealth.23.100901.140546.
+  \bibitem{delacre2019} M.~Delacre, C.~Leys, Y.~L. Mora, and D.~Lakens, ``Taking parametric
+    assumptions seriously: Arguments for the use of Welch's $F$-test instead of the classical
+    $F$-test in one-way ANOVA,'' \emph{Int. Rev. Soc. Psychol.}, vol.~32, no.~1, p.~13, 2019,
+    doi: 10.5334/irsp.198.
+  \bibitem{cameron2015} A.~C. Cameron and D.~L. Miller, ``A practitioner's guide to
+    cluster-robust inference,'' \emph{J. Human Resources}, vol.~50, no.~2, pp.~317--372,
+    2015, doi: 10.3368/jhr.50.2.317.
+  \bibitem{duan1983} N.~Duan, ``Smearing estimate: A nonparametric retransformation
+    method,'' \emph{J. Amer. Statist. Assoc.}, vol.~78, no.~383, pp.~605--610, 1983,
+    doi: 10.1080/01621459.1983.10478017.
+
+  % Tài liệu giữ chỗ (placeholder) cho các trích dẫn ref1..ref19 ở Mục 2
+  \bibitem{ref1} [Chờ bổ sung tài liệu tham khảo \texttt{ref1} cho Mục 2 (ngưỡng 75 W khe PCIe).]
+  \bibitem{ref2} [Chờ bổ sung tài liệu tham khảo \texttt{ref2} cho Mục 2.]
+  \bibitem{ref3} [Chờ bổ sung tài liệu tham khảo \texttt{ref3} cho Mục 2.]
+  \bibitem{ref4} [Chờ bổ sung tài liệu tham khảo \texttt{ref4} cho Mục 2.]
+  \bibitem{ref5} [Chờ bổ sung tài liệu tham khảo \texttt{ref5} cho Mục 2.]
+  \bibitem{ref6} [Chờ bổ sung tài liệu tham khảo \texttt{ref6} cho Mục 2.]
+  \bibitem{ref7} [Chờ bổ sung tài liệu tham khảo \texttt{ref7} cho Mục 2.]
+  \bibitem{ref8} [Chờ bổ sung tài liệu tham khảo \texttt{ref8} cho Mục 2.]
+  \bibitem{ref9} [Chờ bổ sung tài liệu tham khảo \texttt{ref9} cho Mục 2.]
+  \bibitem{ref10} [Chờ bổ sung tài liệu tham khảo \texttt{ref10} cho Mục 2.]
+  \bibitem{ref11} [Chờ bổ sung tài liệu tham khảo \texttt{ref11} cho Mục 2.]
+  \bibitem{ref12} [Chờ bổ sung tài liệu tham khảo \texttt{ref12} cho Mục 2.]
+  \bibitem{ref13} [Chờ bổ sung tài liệu tham khảo \texttt{ref13} cho Mục 2.]
+  \bibitem{ref14} [Chờ bổ sung tài liệu tham khảo \texttt{ref14} cho Mục 2.]
+  \bibitem{ref15} [Chờ bổ sung tài liệu tham khảo \texttt{ref15} cho Mục 2.]
+  \bibitem{ref16} [Chờ bổ sung tài liệu tham khảo \texttt{ref16} cho Mục 2.]
+  \bibitem{ref17} [Chờ bổ sung tài liệu tham khảo \texttt{ref17} cho Mục 2.]
+  \bibitem{ref18} [Chờ bổ sung tài liệu tham khảo \texttt{ref18} cho Mục 2.]
+  \bibitem{ref19} [Chờ bổ sung tài liệu tham khảo \texttt{ref19} cho Mục 2.]
+\end{thebibliography}
+
+% ==================== PHU LUC ====================================
+\clearpage
+\appendix
+\phantomsection
+\section*{Phụ lục A}
+\addcontentsline{toc}{section}{Phụ lục A}
+\phantomsection
+\subsection*{Đoạn code được sử dụng}
+\addcontentsline{toc}{subsection}{Đoạn code được sử dụng}
+[Dán mã nguồn đầy đủ vào môi trường lstlisting, hoặc dùng lệnh dưới đây.]
+
+% Neu co tep phan_tich.py, bo dau % o dong sau:
+% \lstinputlisting[language=Python]{phan_tich.py}
+
+\end{document}

@@ -1,0 +1,40 @@
+MẪU ĐỊNH DẠNG BÁO CÁO XÁC SUẤT VÀ THỐNG KÊ
+
+Đây là mẫu LaTeX dựng lại bố cục của PDF tham chiếu, không phải bản chép
+toàn bộ nội dung báo cáo gốc. Các đoạn trong ngoặc vuông là chỗ cần thay.
+
+THÀNH PHẦN
+- Mau_bao_cao_Xac_suat_thong_ke.tex: mã nguồn chính, có chú thích từng phần.
+- logo_bach_khoa.png: logo được trích từ PDF tham chiếu.
+- Mau_bao_cao_Xac_suat_thong_ke.pdf: bản biên dịch để xem trước định dạng.
+
+SỬ DỤNG TRÊN OVERLEAF
+1. Chọn New Project > Upload Project và tải tệp ZIP này lên.
+2. Đặt Main document là Mau_bao_cao_Xac_suat_thong_ke.tex.
+3. Trong Settings/Menu, đặt Compiler là XeLaTeX.
+4. Bấm Recompile. Biên dịch lại nếu mục lục hoặc tổng số trang chưa cập nhật.
+
+SỬ DỤNG TRÊN MÁY CÁ NHÂN
+Cài TeX Live hoặc MiKTeX có XeLaTeX và các gói trong phần đầu tệp.
+Chạy hai lần:
+  xelatex Mau_bao_cao_Xac_suat_thong_ke.tex
+
+CHỖ CẦN SỬA
+- Phần 4: tên môn, học kỳ, năm học, đề tài, giảng viên, lớp/nhóm, ngày tháng.
+- Trang bìa và bảng phân công: tên, MSSV và nhiệm vụ của thành viên.
+- Nội dung: thay các đoạn minh họa bằng bài của nhóm; xóa mục không dùng.
+- Hình: đặt tệp ảnh cùng thư mục và dùng lệnh HinhBaoCao trong mã nguồn.
+- Khối mã mặc định dùng Python; có thể đổi thành R trong cấu hình listings.
+- Không gõ số trang hay số mục bằng tay; LaTeX cập nhật tự động.
+
+ĐẶC ĐIỂM ĐỊNH DẠNG
+Giấy A4, cỡ chữ thân bài 10 pt, họ chữ Latin Modern gần kiểu Computer Modern
+trong PDF gốc; trang bìa có logo; đầu trang hai dòng và logo nhỏ; đường kẻ
+đầu/cuối trang; chân trang trái ghi môn học/học kỳ/năm học, bên phải Page x/y.
+Bìa không tính số trang. Có mục lục, danh sách hình, 4 cấp tiêu đề, công thức,
+bảng, hình, mã nguồn, tài liệu tham khảo và phụ lục.
+
+LƯU Ý
+Kích thước được dựng lại theo bản PDF nên không bảo đảm trùng từng điểm ảnh
+với mã nguồn gốc. Dấu đóng của trang chia sẻ tài liệu và nét che thông tin
+cá nhân trong PDF không được đưa vào mẫu. Số trang thay đổi theo nội dung.

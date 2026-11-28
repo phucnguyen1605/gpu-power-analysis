@@ -1,0 +1,287 @@
+\section{Kiến thức nền}
+
+Phần này xây dựng cơ sở cho việc mô tả công suất GPU rời, ước lượng các đặc trưng tổng thể, so sánh các nhóm sản phẩm và phân tích mối liên hệ giữa công suất với thông số kỹ thuật. Các phương pháp chính gồm thống kê mô tả, ước lượng khoảng, kiểm định giả thuyết, phân tích phương sai và hồi quy tuyến tính bội. Kết quả được diễn giải theo phạm vi dữ liệu sản phẩm và các giả định của từng phương pháp.
+
+\subsection{Đối tượng nghiên cứu và quy ước}
+
+Đơn vị quan sát là một mẫu hoặc phiên bản GPU trong tệp \texttt{All\_GPUs.csv}. Phạm vi nghiên cứu gồm GPU rời; sản phẩm tích hợp không thuộc đối tượng phân tích. Biến đáp ứng \(P\) là giá trị của trường \texttt{Max\_Power}, được quy đổi về watt (W). Đây là thông số công suất được ghi trong cơ sở dữ liệu, không mặc nhiên là công suất đo được khi chạy một ứng dụng cụ thể. Chỉ sử dụng tên gọi TDP hoặc TGP nếu mô tả nguồn xác nhận ý nghĩa tương ứng.
+
+Công suất có đơn vị W, còn điện năng tiêu thụ có thể có đơn vị Wh hoặc kWh. Vì vậy, phân tích \texttt{Max\_Power} không trực tiếp cho biết điện năng tiêu thụ hoặc chi phí điện trong thực tế. Các biến giải thích được xem xét gồm băng thông bộ nhớ, xung nhịp lõi, tiến trình chế tạo, dung lượng và loại bộ nhớ, hãng sản xuất và loại thiết bị.
+
+Ngưỡng 75 W được sử dụng như một mốc tham chiếu có cơ sở kỹ thuật: tài liệu GIGABYTE nêu khe PCI Express trên bo mạch chủ có thể cấp tới 75 W cho card đồ họa \cite{ref1}. Ý nghĩa này gắn với card máy tính để bàn; không xem 75 W là giới hạn chung cho GPU notebook hoặc là bằng chứng trực tiếp về cấu hình đầu cấp điện của từng sản phẩm.
+
+Ký hiệu \(n\) luôn chỉ số quan sát hợp lệ thực sự tham gia một phép phân tích, sau khi xử lý các giá trị thiếu hoặc không phù hợp. Các phép phân tích có thể sử dụng những cỡ mẫu khác nhau; cần báo cáo \(n\) và số quan sát của từng nhóm tương ứng. Ký hiệu \(t_{q,\nu}\), \(z_q\) và \(F_{q;d_1,d_2}\) lần lượt là phân vị mức \(q\) của phân phối Student, chuẩn tắc và Fisher với các bậc tự do ghi kèm.
+
+\subsection{Thống kê mô tả và khảo sát mối liên hệ}
+
+Với \(n\) giá trị hợp lệ \(x_1,\ldots,x_n\), trung bình mẫu, phương sai mẫu hiệu chỉnh và độ lệch chuẩn mẫu được tính bằng:
+\nopagebreak[4]
+\[
+\bar{x}=\frac{1}{n}\sum_{i=1}^{n}x_i,\qquad
+s^2=\frac{\sum_{i=1}^{n}(x_i-\bar{x})^2}{n-1},\qquad s=\sqrt{s^2}.
+\]
+
+Trung bình phản ánh vị trí trung tâm nhưng nhạy với các giá trị cực đoan. Trung vị và khoảng tứ phân vị \(IQR=Q_3-Q_1\) hữu ích khi phân phối lệch. Histogram mô tả hình dạng phân phối; boxplot so sánh vị trí và độ phân tán giữa các nhóm. Các điểm ngoài hàng rào \(Q_1-1.5IQR\) và \(Q_3+1.5IQR\) được đánh dấu để kiểm tra, không tự động bị loại khỏi dữ liệu.
+
+Với các cặp quan sát hợp lệ \((x_i,y_i)\), hệ số tương quan Pearson đo mức độ và chiều hướng liên hệ tuyến tính:
+\nopagebreak[4]
+\[
+r_{XY}=\frac{\sum_{i=1}^{n}(x_i-\bar{x})(y_i-\bar{y})}
+{\sqrt{\sum_{i=1}^{n}(x_i-\bar{x})^2\sum_{i=1}^{n}(y_i-\bar{y})^2}}.
+\]
+
+Hệ số này xác định khi cả hai biến có phương sai khác 0 và nhận giá trị trong \([-1,1]\). Giá trị gần 0 không loại trừ quan hệ phi tuyến. Scatterplot cần được xem cùng hệ số tương quan để nhận diện độ cong, phân nhóm và điểm ảnh hưởng. Tương quan từng cặp không phản ánh đầy đủ mối liên hệ sau khi đã điều chỉnh theo các thông số khác.
+
+\subsection{Nguyên tắc ước lượng và kiểm định giả thuyết}
+
+Ước lượng điểm sử dụng thống kê mẫu để ước lượng tham số tổng thể. Khoảng tin cậy lượng hóa độ bất định do biến động lấy mẫu hoặc mô hình xác suất. Mức tin cậy 95\% có nghĩa là trong quy trình lấy mẫu lặp lại, khoảng 95\% các khoảng được xây dựng bằng cùng phương pháp sẽ chứa tham số thật khi các giả định được thỏa mãn \cite{ref2}.
+
+Một kiểm định được xác định bởi giả thuyết không \(H_0\), giả thuyết đối \(H_1\), mức ý nghĩa \(\alpha\) và thống kê kiểm định. Trong phần này, chọn \(\alpha=0.05\) nếu bài toán không quy định khác. Chiều kiểm định và ngưỡng so sánh cần được xác định trước khi xem kết quả. Giá trị p là xác suất, dưới \(H_0\) và mô hình giả định, thu được thống kê ít nhất cực đoan như giá trị quan sát theo chiều kiểm định đã chọn.
+
+Bác bỏ \(H_0\) khi \(p\leq\alpha\); khi \(p>\alpha\), kết luận chưa đủ bằng chứng bác bỏ \(H_0\), không kết luận hai nhóm chắc chắn bằng nhau hoặc mô hình chắc chắn đúng. Sai lầm loại I là bác bỏ một \(H_0\) đúng; sai lầm loại II là không bác bỏ một \(H_0\) sai. Bên cạnh giá trị p, cần báo cáo chênh lệch hoặc hệ số ước lượng, đơn vị đo và khoảng tin cậy để đánh giá ý nghĩa thực tiễn.
+
+Các phép suy diễn cần cơ chế chọn mẫu hoặc mô hình xác suất phù hợp. Cơ sở dữ liệu sản phẩm không bảo đảm là mẫu ngẫu nhiên đại diện cho toàn bộ thị trường; nhiều phiên bản cùng dòng GPU còn có thể phụ thuộc nhau. Cỡ mẫu lớn có thể cải thiện xấp xỉ phân phối của trung bình dưới những điều kiện thích hợp, nhưng không khắc phục sai lệch chọn mẫu hoặc sự phụ thuộc. Kết luận do đó được giới hạn ở phạm vi sản phẩm và giả định phân tích.
+
+\subsection{Ước lượng và kiểm định một mẫu}
+
+\subsubsection{Trung bình công suất}
+
+Gọi \(\mu\) là trung bình tổng thể của \(P\). Khi phương sai tổng thể chưa biết, khoảng tin cậy hai phía mức \(1-\alpha\) và thống kê kiểm định tại \(\mu_0\) là \cite{ref2}:
+\nopagebreak[4]
+\[
+CI_{1-\alpha}(\mu)=\bar{x}\pm t_{1-\alpha/2,n-1}\frac{s}{\sqrt{n}},
+\qquad t=\frac{\bar{x}-\mu_0}{s/\sqrt{n}}.
+\]
+
+Phân phối Student là chính xác với mẫu độc lập từ tổng thể chuẩn; với mẫu lớn có thể dùng xấp xỉ khi trung bình mẫu ổn định và không bị chi phối bởi một vài quan sát cực đoan. Với bài toán công suất trung bình vượt 75 W, đặt:
+\nopagebreak[4]
+\[H_0:\mu\leq75,\qquad H_1:\mu>75.\]
+
+Thống kê được tính tại biên \(\mu_0=75\). Bác bỏ \(H_0\) nếu \(t>t_{0.95,n-1}\) hoặc giá trị p một phía không quá 0.05. Khoảng tin cậy hai phía 95\% ở trên được báo cáo để mô tả độ bất định; nó không phải khoảng một phía tương ứng trực tiếp với kiểm định này.
+
+\subsubsection{Tỉ lệ GPU vượt ngưỡng}
+
+Đặt \(I_i=1\) nếu \(P_i>75\) và \(I_i=0\) nếu \(P_i\leq75\). Với \(c=\sum_{i=1}^{n}I_i\), tỉ lệ mẫu là \(\hat p=c/n\). Gọi \(p\) là tỉ lệ tổng thể tương ứng và \(p_0\) là tỉ lệ chuẩn được xác định theo câu hỏi nghiên cứu, với \(0<p_0<1\). Kiểm định phía phải được viết:
+\nopagebreak[4]
+\[H_0:p\leq p_0,\qquad H_1:p>p_0.\]
+
+Thống kê Z dạng score dùng phương sai tại biên của giả thuyết không \cite{ref3}:
+\nopagebreak[4]
+\[Z=\frac{\hat p-p_0}{\sqrt{p_0(1-p_0)/n}}.\]
+
+Xấp xỉ chuẩn cần số thành công và thất bại kỳ vọng dưới \(H_0\) đủ lớn; một quy tắc thực hành là \(np_0\geq10\) và \(n(1-p_0)\geq10\). Nếu điều kiện không phù hợp, có thể dùng kiểm định nhị thức chính xác. Với mức 5\% phía phải, bác bỏ khi \(Z>z_{0.95}\approx1.645\).
+
+Khoảng tin cậy Wilson hai phía 95\% cho \(p\) là \cite{ref4}:
+\nopagebreak[4]
+\[
+\frac{\hat p+\dfrac{z^2}{2n}\ \pm\ z\sqrt{\dfrac{\hat p(1-\hat p)}{n}+\dfrac{z^2}{4n^2}}}
+{1+\dfrac{z^2}{n}},\qquad z=z_{0.975}\approx1.96.
+\]
+
+Không nhầm 1.96 của khoảng hai phía với 1.645 của kiểm định phía phải. Khi thực hiện bằng \texttt{proportions\_ztest}, cần đặt \texttt{prop\_var=p0} để phương sai khớp với công thức score; mặc định của hàm dùng tỉ lệ mẫu \cite{ref4}. Tính độc lập và khả năng đại diện vẫn là điều kiện cần cho diễn giải suy diễn.
+
+\subsection{So sánh hai nhóm độc lập}
+
+Để so sánh công suất giữa Notebook và Desktop, hoặc giữa hai hãng được lựa chọn trước, đặt \(\Delta=\mu_1-\mu_2\). Giả thuyết hai phía là \(H_0:\Delta=0\) và \(H_1:\Delta\neq0\). Cần xác định rõ thứ tự nhóm để dấu của chênh lệch có ý nghĩa nhất quán.
+
+\subsubsection{Kiểm định Welch}
+
+Welch là lựa chọn chính khi so sánh hai trung bình mà không giả định phương sai bằng nhau. Với trung bình \(\bar x_j\), phương sai \(s_j^2\) và cỡ mẫu \(n_j\) của nhóm \(j\), thống kê và bậc tự do xấp xỉ là \cite{ref5}:
+\nopagebreak[4]
+\[t_W=\frac{\bar x_1-\bar x_2}{\sqrt{s_1^2/n_1+s_2^2/n_2}},\qquad
+\nu=\frac{(s_1^2/n_1+s_2^2/n_2)^2}
+{\dfrac{(s_1^2/n_1)^2}{n_1-1}+\dfrac{(s_2^2/n_2)^2}{n_2-1}}.\]
+
+Khoảng tin cậy 95\% cho chênh lệch trung bình:
+\nopagebreak[4]
+\[CI_{95\%}(\Delta)=(\bar x_1-\bar x_2)\pm t_{0.975,\nu}\sqrt{s_1^2/n_1+s_2^2/n_2}.\]
+
+Welch vẫn cần các quan sát độc lập và độ ổn định của trung bình từng nhóm. Với nhóm nhỏ, phân phối quá lệch hoặc ngoại lệ mạnh có thể làm xấp xỉ kém. Không bắt buộc phải dùng kiểm định phương sai làm bước quyết định tự động giữa Welch và kiểm định gộp.
+
+\subsubsection{Kiểm định t với phương sai gộp}
+
+Khi có cơ sở cho giả định hai phương sai tổng thể bằng nhau, đặt:
+\nopagebreak[4]
+\[s_p^2=\frac{(n_1-1)s_1^2+(n_2-1)s_2^2}{n_1+n_2-2},\qquad
+t=\frac{\bar x_1-\bar x_2}{s_p\sqrt{1/n_1+1/n_2}}.\]
+
+Thống kê có \(n_1+n_2-2\) bậc tự do dưới các giả định chuẩn và độc lập. Trong SciPy, \texttt{ttest\_ind} mặc định giả định phương sai bằng nhau; cần đặt \texttt{equal\_var=False} để thực hiện Welch \cite{ref5}.
+
+\subsubsection{Kiểm định Mann Whitney}
+
+Mann-Whitney U là phép kiểm định dựa trên thứ hạng cho hai mẫu độc lập. Trong cách trình bày thông dụng, giả thuyết không là hai phân phối tổng thể giống nhau. Phép kiểm định không trực tiếp kiểm tra chênh lệch trung bình. Chỉ khi có thêm giả định phù hợp, chẳng hạn hai phân phối cùng hình dạng và khác vị trí, mới diễn giải kết quả theo độ dịch chuyển hoặc trung vị \cite{ref6}.
+
+Vì vậy, không tự động đổi từ Welch sang Mann-Whitney chỉ vì Shapiro-Wilk cho giá trị p nhỏ. Lựa chọn phương pháp phải gắn với đại lượng muốn so sánh, cỡ mẫu, hình dạng phân phối và mức độ ảnh hưởng của ngoại lệ. Nếu có cấu trúc ghép cặp thực sự, cần dùng phương pháp cho mẫu cặp thay vì các kiểm định độc lập trên.
+
+\subsection{Phân tích phương sai}
+
+\subsubsection{ANOVA một nhân tố}
+
+ANOVA một nhân tố so sánh trung bình của \(g\) nhóm, ví dụ các loại bộ nhớ GPU. Với quan sát \(y_{ij}\) thứ \(j\) trong nhóm \(i\), giả thuyết kiểm định là:
+\nopagebreak[4]
+\[H_0:\mu_1=\cdots=\mu_g,\qquad H_1:\text{có ít nhất một cặp trung bình khác nhau}.\]
+
+Gọi \(n_i\) là cỡ mẫu nhóm \(i\), \(n=\sum_{i=1}^{g}n_i\), \(\bar y_i\) là trung bình nhóm và \(\bar y\) là trung bình chung có trọng số theo cỡ nhóm. Tổng bình phương được phân rã như sau \cite{ref7}:
+\nopagebreak[4]
+\[SSB=\sum_{i=1}^{g}n_i(\bar y_i-\bar y)^2,\qquad
+SSW=\sum_{i=1}^{g}\sum_{j=1}^{n_i}(y_{ij}-\bar y_i)^2.\]
+\nopagebreak[4]
+\[SST=\sum_{i=1}^{g}\sum_{j=1}^{n_i}(y_{ij}-\bar y)^2=SSB+SSW.\]
+
+Thống kê kiểm định là:
+\nopagebreak[4]
+\[F=\frac{MSB}{MSW}=\frac{SSB/(g-1)}{SSW/(n-g)}.\]
+
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.22}
+\begin{tabularx}{\linewidth}{@{}L{0.24\linewidth} C{0.16\linewidth} C{0.14\linewidth} X@{}}
+\toprule
+\rowcolor{TableHead}
+\textbf{Nguồn biến thiên} & \textbf{Tổng bình phương} & \textbf{Bậc tự do} & \textbf{Trung bình bình phương} \\
+\midrule
+Giữa các nhóm & $SSB$ & $g-1$ & $MSB=SSB/(g-1)$ \\
+Trong các nhóm & $SSW$ & $n-g$ & $MSW=SSW/(n-g)$ \\
+Tổng & $SST$ & $n-1$ & \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+
+ANOVA cổ điển giả định sai số độc lập, phân phối chuẩn với kỳ vọng 0 và phương sai chung. Dưới \(H_0\) cùng các giả định này, \(F\) có phân phối Fisher với \((g-1,n-g)\) bậc tự do. Bác bỏ nếu \(F>F_{0.95;g-1,n-g}\) hoặc giá trị p không quá 0.05. Việc bác bỏ không xác định ngay cặp nhóm nào khác nhau \cite{ref7}.
+
+\subsubsection{Phương sai không đồng nhất và hậu kiểm}
+
+Khi phương sai khác nhau, đặc biệt nếu cỡ nhóm không cân bằng, Welch ANOVA là phương án so sánh trung bình phù hợp hơn ANOVA cổ điển. Phương pháp sử dụng trọng số liên quan đến phương sai và bậc tự do hiệu chỉnh; nó không dùng trực tiếp thống kê F cổ điển ở trên. Trong Python có thể thực hiện bằng \texttt{anova\_oneway} với \texttt{use\_var=\textquotesingle{}unequal\textquotesingle{}} \cite{ref8}.
+
+Khi cần so sánh nhiều cặp sau phân tích tổng thể, sử dụng phương pháp kiểm soát sai lầm do so sánh nhiều lần. Tukey HSD áp dụng khi phương sai bằng nhau và cỡ nhóm bằng nhau; Tukey-Kramer mở rộng cho cỡ nhóm khác nhau. Games-Howell phù hợp với phương sai không bằng nhau \cite{ref9}. Báo cáo chênh lệch từng cặp, khoảng tin cậy và giá trị p đã hiệu chỉnh.
+
+Kruskal-Wallis là lựa chọn dựa trên thứ hạng khi câu hỏi nghiên cứu hướng tới khác biệt phân phối hoặc vị trí và các điều kiện áp dụng phù hợp \cite{ref10}. Đây không phải phép kiểm định trực tiếp sự bằng nhau của trung bình. Khi muốn diễn giải theo trung vị, cần xem xét thêm sự tương đồng về hình dạng và độ phân tán giữa các nhóm. Hậu kiểm Dunn kết hợp hiệu chỉnh Holm có thể dùng cho so sánh từng cặp sau Kruskal-Wallis \cite{ref11}.
+
+\subsubsection{ANOVA hai nhân tố có tương tác}
+
+Để khảo sát đồng thời hãng sản xuất \(A\) và loại thiết bị \(T\), mô hình cho quan sát thứ \(k\) tại mức \(i\) của hãng và mức \(j\) của thiết bị là \cite{ref12}:
+\nopagebreak[4]
+\[y_{ijk}=\mu+a_i+b_j+(ab)_{ij}+\varepsilon_{ijk}.\]
+
+Trong đó, \(a_i\) và \(b_j\) là hiệu ứng chính, còn \((ab)_{ij}\) là hiệu ứng tương tác. Tương tác có nghĩa là chênh lệch giữa các hãng thay đổi theo loại thiết bị. Các giả thuyết dưới một quy ước nhận dạng hệ số thích hợp được viết:
+\nopagebreak[4]
+\[H_{0A}:a_i=0\ \text{với mọi }i;\qquad H_{0T}:b_j=0\ \text{với mọi }j;\]
+\nopagebreak[4]
+\[H_{0AT}:(ab)_{ij}=0\ \text{với mọi }i,j.\]
+
+Giả thuyết đối tương ứng là có ít nhất một hệ số hoặc tổ hợp hiệu ứng được kiểm định khác 0. Khi tương tác đáng kể, ưu tiên diễn giải các chênh lệch giữa hãng trong từng loại thiết bị hoặc ngược lại, kèm hiệu chỉnh so sánh nhiều lần. Không chỉ dựa vào một hiệu ứng chính gộp để kết luận cho mọi nhóm.
+
+Với thiết kế cân bằng có \(a\) hãng, \(b\) loại thiết bị và \(r\) quan sát độc lập trong mỗi ô, \(n=abr\). Bậc tự do cho hãng, loại thiết bị, tương tác và sai số lần lượt là \(a-1\), \(b-1\), \((a-1)(b-1)\) và \(ab(r-1)\). Mỗi thống kê F được lập từ trung bình bình phương của hiệu ứng chia cho trung bình bình phương sai số. Mô hình đầy đủ cần bậc tự do sai số dương; nếu mỗi ô chỉ có một quan sát, không thể kiểm định tương tác theo cách này \cite{ref12}.
+
+Với dữ liệu sản phẩm không cân bằng hoặc có ô trống, cần kiểm tra khả năng ước lượng các hiệu ứng, xác định rõ mã hóa nhân tố và loại tổng bình phương sử dụng. Không áp dụng máy móc các công thức của thiết kế cân bằng hoặc loại nhóm chỉ vì kết quả kiểm định không thuận lợi.
+
+\subsection{Hồi quy tuyến tính bội}
+
+\subsubsection{Mô hình và mã hóa biến}
+
+Hồi quy bội mô tả mối liên hệ giữa công suất và nhiều đặc trưng đồng thời. Mô hình tuyến tính tổng quát là:
+\nopagebreak[4]
+\[Y_i=\beta_0+\sum_{j=1}^{q}\beta_jX_{ij}+\varepsilon_i.\]
+
+Tính tuyến tính được hiểu theo các hệ số, nên mô hình có thể chứa biến đã lấy log hoặc biến giả. Một mô hình ứng viên cho bài toán GPU được viết theo hai thành phần để làm rõ các biến:
+\nopagebreak[4]
+\[z_i=\ln P_i=\beta_0+\beta_1\ln B_i+\beta_2\ln F_i+\beta_3L_i+\beta_4\ln M_i+C_i+\varepsilon_i,\]
+\nopagebreak[4]
+\[C_i=\sum_{h=1}^{a-1}\gamma_hD_{ih}+\delta N_i.\]
+
+Ở đây, \(B\) là băng thông bộ nhớ (GB/s), \(F\) là xung nhịp lõi (MHz), \(L\) là kích thước tiến trình chế tạo (nm), \(M\) là dung lượng bộ nhớ (GB), sau khi chuẩn hóa đơn vị. Ký hiệu \(F_i\) trong mô hình là xung nhịp, khác với thống kê kiểm định F. Có \(a\) hãng; chọn một hãng tham chiếu và tạo \(a-1\) biến giả \(D_{ih}\). Biến \(D_{ih}=1\) khi quan sát thuộc hãng \(h\) và bằng 0 trong trường hợp còn lại; \(\gamma_h\) là hệ số của biến giả đó. Quy ước \(N_i=1\) cho Notebook và \(N_i=0\) cho Desktop.
+
+Điều kiện \(P_i,B_i,F_i,M_i>0\) bảo đảm phép lấy log xác định. Các giá trị thiếu, bằng 0 hoặc không hợp lệ cần được kiểm tra theo ý nghĩa dữ liệu; không tự ý thay bằng một hằng số nhỏ chỉ để lấy log. Việc chọn dạng log phải dựa trên cấu trúc quan hệ và chẩn đoán phần dư, không chỉ dựa vào tính dương hoặc sự không chuẩn của dữ liệu thô.
+
+\subsubsection{Ước lượng bằng bình phương tối thiểu}
+
+Gọi \(\symbfup{X}\) là ma trận thiết kế gồm hệ số chặn và \(q\) cột giải thích, tính cả các cột biến giả. Phương pháp bình phương tối thiểu OLS chọn hệ số làm nhỏ nhất tổng bình phương phần dư \cite{ref13}:
+\nopagebreak[4]
+\[\hat{\symbfit{\theta}}=(\symbfup{X}^\top\symbfup{X})^{-1}\symbfup{X}^\top\symbfup{z},\qquad
+SSE=\sum_{i=1}^{n}(z_i-\hat z_i)^2.\]
+
+Công thức nghịch đảo trên áp dụng khi \(\symbfup{X}\) có hạng cột đầy đủ. Với mô hình log, phần dư là \(e_i=z_i-\hat z_i\), không phải \(P_i-\hat P_i\). Điều kiện \(E(\varepsilon_i\mid\symbfup{X})=0\) là nền tảng cho diễn giải hệ số theo mô hình trung bình có điều kiện. Sự phụ thuộc giữa các biến giải thích không đồng nghĩa chúng phải độc lập với nhau, nhưng không được có đa cộng tuyến hoàn hảo.
+
+\subsubsection{Diễn giải hệ số trong mô hình log}
+
+Giữ các biến còn lại không đổi, \(\beta_1\), \(\beta_2\) và \(\beta_4\) là hệ số co giãn của giá trị dự báo sau biến đổi ngược theo \(B\), \(F\) và \(M\). Chẳng hạn, khi \(B\) tăng 1\%, giá trị dự báo này thay đổi chính xác \(100[(1.01)^{\beta_1}-1]\%\), xấp xỉ \(\beta_1\%\). Với \(L\) không lấy log, tăng 1 nm tương ứng thay đổi \(100[\exp(\beta_3)-1]\%\); không diễn giải \(\beta_3\) như độ co giãn \cite{ref14}.
+
+Hệ số biến giả hãng tương ứng với chênh lệch \(100[\exp(\gamma_h)-1]\%\) so với hãng tham chiếu; hệ số Notebook tương ứng với \(100[\exp(\delta)-1]\%\) so với Desktop. Các diễn giải này gắn với \(\exp\{E(\ln P\mid X)\}\), tức trung bình nhân có điều kiện, và mang ý nghĩa liên hệ thống kê sau điều chỉnh. Để diễn giải theo trung bình số học \(E(P\mid X)\), cần xét thêm yếu tố hiệu chỉnh khi biến đổi ngược \cite{ref14}.
+
+\subsubsection{Độ phù hợp và kiểm định hệ số}
+
+Trong mô hình có hệ số chặn, đặt \(SST_z=\sum_{i=1}^{n}(z_i-\bar z)^2\). Hệ số xác định và hệ số xác định hiệu chỉnh là \cite{ref13}:
+\nopagebreak[4]
+\[R^2=1-\frac{SSE}{SST_z},\qquad
+R^2_{\mathrm{adj}}=1-(1-R^2)\frac{n-1}{n-q-1}.\]
+
+\(R^2\) biểu thị phần biến thiên của \(\ln P\) được mô hình giải thích trong mẫu, không trực tiếp là phần biến thiên của công suất trên thang W. \(R^2_{\mathrm{adj}}\) điều chỉnh theo số biến giải thích; cả hai chỉ số đều không tự chứng minh quan hệ nhân quả hoặc khả năng dự báo tốt cho sản phẩm mới.
+
+Để kiểm định một hệ số \(\theta_j\), bao gồm hệ số của biến định lượng hoặc biến giả, dùng \(H_0:\theta_j=0\) và \(H_1:\theta_j\neq0\). Dưới các giả định cổ điển và sai số chuẩn thông thường:
+\nopagebreak[4]
+\[t_j=\frac{\hat\theta_j}{SE(\hat\theta_j)},\qquad
+CI_{95\%}(\theta_j)=\hat\theta_j\pm t_{0.975,n-q-1}SE(\hat\theta_j).\]
+
+Kiểm định F toàn cục có \(H_0\) là toàn bộ hệ số ngoài hệ số chặn bằng 0. Thống kê cổ điển là:
+\nopagebreak[4]
+\[F=\frac{(SST_z-SSE)/q}{SSE/(n-q-1)}\sim F_{q,n-q-1}\quad\text{dưới }H_0.\]
+
+Phân phối t và F nêu trên là chính xác khi sai số độc lập, chuẩn và có phương sai không đổi, với mô hình trung bình được chỉ định đúng. Nếu dùng sai số chuẩn robust, phải báo cáo kiểm định và khoảng tin cậy tương ứng với ma trận hiệp phương sai robust, không tái sử dụng công thức F cổ điển theo SSE một cách máy móc \cite{ref13,ref18}.
+
+\subsubsection{Dự báo và biến đổi về thang công suất}
+
+Khoảng tin cậy cho trung bình đáp ứng tại một cấu hình khác với khoảng dự báo cho một GPU mới; khoảng dự báo còn bao gồm biến động cá thể và thường rộng hơn \cite{ref19}. Không suy diễn ngoài miền thông số được quan sát khi chưa có kiểm chứng phù hợp.
+
+Với mô hình log, \(\exp(\hat z)\) không mặc nhiên ước lượng trung bình số học của \(P\). Nếu sai số trên thang log có phân phối chuẩn với phương sai không đổi \(\sigma^2\), trung bình số học có điều kiện là \(\exp(X\theta+\sigma^2/2)\). Có thể xem xét hiệu chỉnh biến đổi ngược khi mục tiêu là dự báo trung bình công suất theo W; phương pháp hiệu chỉnh cần phù hợp với phân phối và phương sai của sai số \cite{ref14}. Nếu đánh giá dự báo, nên báo cáo sai số trên thang W bằng dữ liệu kiểm tra hoặc kiểm định chéo, thay vì chỉ dựa vào \(R^2\) trong mẫu.
+
+\subsection{Kiểm tra giả định và chẩn đoán mô hình}
+
+Chẩn đoán nhằm đánh giá mức độ phù hợp của mô hình và độ tin cậy của suy diễn; các kiểm định riêng lẻ không chứng minh mọi giả định đều đúng. Kết hợp thông tin về nguồn dữ liệu, đồ thị và các chỉ số định lượng \cite{ref15}.
+
+\textbf{Tính độc lập và mô hình trung bình.} Kiểm tra bản ghi trùng, các phiên bản cùng dòng sản phẩm và cấu trúc nhóm có thể tạo phụ thuộc. Giả định \(E(\varepsilon\mid X)=0\) không được bảo đảm chỉ bởi đồ thị phần dư đẹp; các yếu tố bị bỏ sót, như thế hệ sản phẩm hoặc phân khúc, có thể ảnh hưởng cách diễn giải. Khi xác định được cụm phụ thuộc và có đủ cụm phù hợp, có thể cân nhắc sai số chuẩn theo cụm \cite{ref18}.
+
+\textbf{Phân phối chuẩn của sai số.} Trong ANOVA, đánh giá phân phối trong nhóm hoặc phần dư của mô hình; trong hồi quy, đánh giá sai số có điều kiện thông qua phần dư. Không yêu cầu toàn bộ dữ liệu gộp hoặc mọi biến giải thích đều có phân phối chuẩn. Q-Q plot hỗ trợ quan sát độ lệch ở tâm và đuôi. Shapiro-Wilk kiểm định giả thuyết phân phối chuẩn; giá trị p nhỏ là bằng chứng chống lại giả thuyết này, còn giá trị p lớn không chứng minh tính chuẩn. Với mẫu lớn, cần đánh giá cả mức độ sai lệch và tác động thực tế; tài liệu SciPy lưu ý giá trị p của Shapiro-Wilk có thể không chính xác khi \(n>5000\) \cite{ref16}.
+
+\textbf{Phương sai giữa các nhóm.} Với so sánh nhóm hoặc ANOVA, Levene và biến thể dùng trung vị thường gọi là Brown-Forsythe kiểm tra giả thuyết các phương sai bằng nhau \cite{ref16}. Khi bằng chứng và đồ thị cho thấy phương sai khác nhau, xem xét Welch hoặc Welch ANOVA và hậu kiểm phù hợp. Không dùng kết quả Levene không có ý nghĩa như bằng chứng khẳng định các phương sai giống hệt nhau.
+
+\textbf{Phương sai trong hồi quy.} Đồ thị phần dư theo giá trị khớp và Scale-Location hỗ trợ phát hiện độ phân tán thay đổi. Breusch-Pagan hoặc White có thể kiểm tra phương sai thay đổi theo các biến giải thích \cite{ref17}. Nếu mô hình trung bình vẫn phù hợp nhưng phương sai thay đổi, sai số chuẩn HC3 có thể hỗ trợ suy diễn vững hơn; biện pháp này không sửa quan hệ phi tuyến bị bỏ sót, sai lệch do nội sinh hoặc sự phụ thuộc giữa quan sát \cite{ref18}.
+
+\textbf{Dạng hàm.} Đồ thị Residuals vs Fitted cần không còn cấu trúc có hệ thống rõ rệt. Xu hướng cong hoặc phân nhóm là tín hiệu xem lại dạng hàm, biến bị bỏ sót hay tương tác. Chọn biến đổi và thành phần bổ sung dựa trên ý nghĩa chuyên môn và độ ổn định của kết quả, không chỉ để đạt giá trị p mong muốn \cite{ref15}.
+
+\textbf{Đa cộng tuyến.} Với cột giải thích thứ \(j\), đặt:
+\nopagebreak[4]
+\[VIF_j=\frac{1}{1-R_j^2},\]
+
+trong đó \(R_j^2\) là hệ số xác định khi hồi quy cột này theo các cột giải thích còn lại và hệ số chặn. VIF lớn cho thấy phương sai ước lượng hệ số bị phóng đại. Ngưỡng 5 là dấu hiệu để xem xét, không phải quy tắc tự động xóa biến. Cần cân nhắc ý nghĩa biến, cấu trúc các biến giả và độ ổn định của hệ số \cite{ref15}.
+
+\textbf{Ngoại lệ và điểm ảnh hưởng.} Phần dư lớn, leverage cao và khoảng cách Cook phản ánh các khía cạnh khác nhau. Với \(p=q+1\) tham số, gồm hệ số chặn, một dạng khoảng cách Cook là:
+\nopagebreak[4]
+\[D_i=\frac{e_i^2}{p\hat\sigma^2}\frac{h_{ii}}{(1-h_{ii})^2},\qquad
+\hat\sigma^2=\frac{SSE}{n-p}.\]
+
+Ở đây \(h_{ii}\) là phần tử đường chéo của ma trận hat \(\symbfup{H}=\symbfup{X}(\symbfup{X}^\top\symbfup{X})^{-1}\symbfup{X}^\top\). Điểm ảnh hưởng cần được kiểm tra nguồn gốc, độ hợp lệ và độ nhạy của kết quả; không loại bỏ chỉ vì làm giảm độ phù hợp của mô hình \cite{ref15}.
+
+\subsection{Liên hệ phương pháp với mục tiêu nghiên cứu}
+
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.22}
+\begin{tabularx}{\linewidth}{@{}L{0.31\linewidth} L{0.29\linewidth} X@{}}
+\toprule
+\rowcolor{TableHead}
+\textbf{Câu hỏi nghiên cứu} & \textbf{Phương pháp chính} & \textbf{Đại lượng cần báo cáo} \\
+\midrule
+Phân bố công suất & Thống kê mô tả và đồ thị & Cỡ mẫu, trung bình, trung vị, độ lệch chuẩn, IQR \\
+Trung bình và tỉ lệ vượt 75 W & Khoảng t và Wilson & Ước lượng, khoảng tin cậy 95\%, cỡ mẫu \\
+Khác biệt giữa các nhóm & Welch hoặc ANOVA phù hợp & Chênh lệch, khoảng tin cậy, giá trị p, hậu kiểm \\
+Tương tác hãng và loại thiết bị & ANOVA hai nhân tố & Kiểm định tương tác, chênh lệch từng nhóm \\
+Liên hệ với thông số kỹ thuật & Hồi quy bội và chẩn đoán & Hệ số, khoảng tin cậy, độ phù hợp, chẩn đoán \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+
+Các lựa chọn cuối cùng cần nhất quán với dữ liệu đã làm sạch, câu hỏi đặt trước và các kiểm tra giả định. Những khác biệt có ý nghĩa thống kê được diễn giải cùng độ lớn hiệu ứng và phạm vi dữ liệu; với dữ liệu quan sát, chúng chưa đủ để khẳng định một thông số gây ra thay đổi công suất.

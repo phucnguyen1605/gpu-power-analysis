@@ -11,3 +11,11 @@ __pycache__/
 .vscode/
 .idea/
 
+# LaTeX build artifacts
+*.aux
+*.lof
+*.log
+*.out
+*.synctex.gz
+*.toc
+
